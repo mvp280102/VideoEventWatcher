@@ -61,7 +61,7 @@ async def process_video(filename: str):
     database_url = f'{sql_dialect}+{db_driver}://{db_user}:{db_user_password}@{host_name}/{db_name}'
     events = processor.events
 
-    logger = EventSaver(database_url, filename, events)
-    logger.log_events()
+    saver = EventSaver(database_url, filename, events)
+    saver.save_events()
 
     return None

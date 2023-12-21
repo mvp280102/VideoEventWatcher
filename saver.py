@@ -32,7 +32,7 @@ class EventSaver:
         self.path = path
         self.raw_events = events
 
-    def log_events(self):
+    def save_events(self):
         with Session(autoflush=False, bind=self.engine) as session:
             for raw_event in self.raw_events:
                 raw_event['filename'] = self.path

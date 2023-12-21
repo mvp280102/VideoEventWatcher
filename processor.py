@@ -100,7 +100,7 @@ class VideoProcessor:
 
         if self.line_data:
             line_k, line_b = get_line_coefficients(*self.line_data)
-            frame = self.draw_line(frame, line_k, line_b)
+            frame = self._draw_line(frame, line_k, line_b)
 
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
@@ -140,7 +140,7 @@ class VideoProcessor:
 
         return frame
 
-    def draw_line(self, frame, k, b):
+    def _draw_line(self, frame, k, b):
         x1 = -b / k
         y1 = b
 
