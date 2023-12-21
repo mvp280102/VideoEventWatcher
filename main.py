@@ -13,6 +13,8 @@ from processor import VideoProcessor
 from cacher import EventCacher
 from saver import EventSaver
 
+from credentials import *
+
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -48,14 +50,15 @@ async def process_video(filename: str):
     checkpoints_path = join('/', 'home', 'mvp280102', 'models', 'yolox')
     input_size = (480, 480)
     frames_skip = 0
+    line_data = (10, (0, 450))
     filter_label = 0
 
     input_path = join(inputs.directory, filename)
 
-    processor = VideoProcessor(model_name, checkpoints_path, input_size, frames_skip, filter_label)
+    processor = VideoProcessor(model_name, checkpoints_path, input_size, frames_skip, line_data, filter_label)
     processor.process_video(input_path)
 
-    database_url = 'postgresql+psycopg2://videologger:videologger@localhost/videologger'
+    database_url = f'{sql_dialect}+{db_driver}://{db_user}:{db_user_password}@{host_name}/{db_name}'
     events = processor.events
 
     logger = EventSaver(database_url, filename, events)

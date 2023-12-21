@@ -1,6 +1,3 @@
-# TODO: Add logger.
-
-
 import numpy
 
 from sqlalchemy import create_engine, Column, ARRAY, INTEGER, VARCHAR, TIMESTAMP
@@ -25,6 +22,7 @@ class Event(BaseModel):
     frame_path = Column(VARCHAR(length=256), nullable=True)
 
 
+# TODO: Logger.
 class EventSaver:
     def __init__(self, database_url, path, events):
         self.engine = create_engine(database_url)

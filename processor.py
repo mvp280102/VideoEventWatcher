@@ -13,12 +13,9 @@ from bytetracker import BYTETracker
 from utils import create_logger, get_line_coefficients, filter_detections, random_color
 
 
+# TODO: Inference time.
 class VideoProcessor:
-
-    # TODO: Add line drawing.
-    # TODO: Add inference time.
-
-    def __init__(self, model_name, checkpoints_dir, input_size=None, frames_skip=None, filter_label=0):
+    def __init__(self, model_name, checkpoints_dir, input_size=None, frames_skip=None, line_data=None, filter_label=0):
         self.logger = create_logger(__name__)
 
         self.reader, self.writer = None, None
@@ -47,6 +44,7 @@ class VideoProcessor:
         self._events = []
 
         self.frames_skip = frames_skip
+        self.line_data = line_data
         self.filter_label = filter_label
 
     def process_video(self, input_path):
@@ -98,8 +96,11 @@ class VideoProcessor:
 
         tracks = self.tracker_model.update(filtered_detections, None)
 
-        line_k, line_b = get_line_coefficients(10, (0, 450))
-        frame = self.draw_line(frame, line_k, line_b)
+        line_k, line_b = None, None
+
+        if self.line_data:
+            line_k, line_b = get_line_coefficients(*self.line_data)
+            frame = self.draw_line(frame, line_k, line_b)
 
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
@@ -108,18 +109,18 @@ class VideoProcessor:
             if track_id not in self.track_colors:
                 self.logger.info(f'Event - new object\t\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
 
-                # TODO: Add frame with detected object.
+                # TODO: Add Frame with detected object.
 
                 self.track_colors[track_id] = random_color()
                 self._events.append({'timestamp': datetime.now(), 'event_name': 'new object',
                                     'track_id': track_id, 'position': (x_anchor, y_anchor)})
 
-            if abs(line_k * x_anchor + line_b - y_anchor) < 1:
+            if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
                 self.logger.info(f'Event - line intersection\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
                 self._events.append({'timestamp': datetime.now(), 'event_name': 'line intersection',
                                     'track_id': track_id, 'position': (x_anchor, y_anchor)})
 
-            # TODO: Add anchor point thickness scaling.
+            # TODO: Anchor point thickness scaling.
 
             font = cv2.FONT_HERSHEY_DUPLEX
             scale = 1
