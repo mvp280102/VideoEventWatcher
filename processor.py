@@ -15,9 +15,9 @@ from utils import create_logger, get_line_coefficients, filter_detections, rando
 
 # TODO: Inference time.
 class VideoProcessor:
-    def __init__(self, model_name, checkpoints_dir, input_size=None, frames_skip=None, line_data=None, filter_label=0):
-        self.logger = create_logger(__name__)
+    logger = create_logger(__name__)
 
+    def __init__(self, model_name, checkpoints_dir, input_size=None, frames_skip=None, line_data=None, filter_label=0):
         self.reader, self.writer = None, None
         self.total_frames, self.fps = None, None
         self.frame_width, self.frame_height = None, None
@@ -34,13 +34,13 @@ class VideoProcessor:
         self.conf_thresh = detector_exp.test_conf
         self.nms_thresh = detector_exp.nmsthre
 
-        self.detector_model = detector_exp.get_model()
-        self.detector_model.cuda() if self.device == 'cuda' else self.detector_model.cpu()
-        self.detector_model.eval()
-        self.detector_model.load_state_dict(checkpoint['model'])
+        self.detector = detector_exp.get_model()
+        self.detector.cuda() if self.device == 'cuda' else self.detector.cpu()
+        self.detector.eval()
+        self.detector.load_state_dict(checkpoint['model'])
 
-        self.tracker_model = BYTETracker()
-        self.track_colors = {}
+        self.tracker = BYTETracker()
+        self._track_colors = {}
         self._events = []
 
         self.frames_skip = frames_skip
@@ -86,7 +86,7 @@ class VideoProcessor:
         input_frame = self._prepare_frame(frame)
 
         with torch.no_grad():
-            raw_detections = self.detector_model(input_frame)
+            raw_detections = self.detector(input_frame)
 
         raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
         filtered_detections = filter_detections(raw_detections[0], label).cpu()
@@ -94,7 +94,7 @@ class VideoProcessor:
         ratio = min(self.input_size[1] / self.frame_width, self.input_size[0] / self.frame_height)
         filtered_detections[:, :4] /= ratio
 
-        tracks = self.tracker_model.update(filtered_detections, None)
+        tracks = self.tracker.update(filtered_detections, None)
 
         line_k, line_b = None, None
 
@@ -106,12 +106,12 @@ class VideoProcessor:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
             x_anchor, y_anchor = int((x_min + x_max) / 2), y_max
 
-            if track_id not in self.track_colors:
+            if track_id not in self._track_colors:
                 self.logger.info(f'Event - new object\t\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
 
-                # TODO: Add Frame with detected object.
+                # TODO: Add frame with detected object.
 
-                self.track_colors[track_id] = random_color()
+                self._track_colors[track_id] = random_color()
                 self._events.append({'timestamp': datetime.now(), 'event_name': 'new object',
                                     'track_id': track_id, 'position': (x_anchor, y_anchor)})
 
@@ -124,7 +124,7 @@ class VideoProcessor:
 
             font = cv2.FONT_HERSHEY_DUPLEX
             scale = 1
-            color = self.track_colors[track_id]
+            color = self._track_colors[track_id]
             thickness = 2
 
             frame = cv2.circle(frame, (int(x_anchor), y_anchor), thickness * 2, color, -1)
