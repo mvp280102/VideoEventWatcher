@@ -10,8 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 
 from processor import VideoProcessor
-from cacher import EventCacher
-from saver import EventSaver
+from sender import EventSender
 
 from credentials import *
 
@@ -58,10 +57,7 @@ async def process_video(filename: str):
     processor = VideoProcessor(model_name, checkpoints_path, input_size, frames_skip, line_data, filter_label)
     processor.process_video(input_path)
 
-    database_url = f'{sql_dialect}+{db_driver}://{db_user}:{db_user_password}@{host_name}/{db_name}'
-    events = processor.events
-
-    saver = EventSaver(database_url, filename, events)
-    saver.save_events()
+    sender = EventSender('vew_events')
+    sender.send_events(processor.events)
 
     return None
