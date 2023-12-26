@@ -1,5 +1,6 @@
 import cv2
 import torch
+import asyncio
 
 from os.path import join
 from datetime import datetime
@@ -47,7 +48,7 @@ class VideoProcessor:
         self.line_data = line_data
         self.filter_label = filter_label
 
-    def process_video(self, input_path):
+    async def process_video(self, input_path):
         self.reader = cv2.VideoCapture(input_path)
 
         self.total_frames = int(self.reader.get(cv2.CAP_PROP_FRAME_COUNT) / 2)
@@ -67,7 +68,7 @@ class VideoProcessor:
                 continue
 
             # self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
-            processed_frame = self._process_frame(raw_frame, self.filter_label)
+            processed_frame = await self._process_frame(raw_frame, self.filter_label)
             self.writer.write(processed_frame)
 
         self.reader.release()
@@ -82,11 +83,14 @@ class VideoProcessor:
             else:
                 break
 
-    def _process_frame(self, frame, label):
+    async def _process_frame(self, frame, label):
         input_frame = self._prepare_frame(frame)
 
         with torch.no_grad():
             raw_detections = self.detector(input_frame)
+
+        # to release GIL:
+        await asyncio.sleep(0.05)
 
         raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
         filtered_detections = filter_detections(raw_detections[0], label).cpu()
