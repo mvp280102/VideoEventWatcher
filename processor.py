@@ -114,7 +114,7 @@ class VideoProcessor:
 
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
-            x_anchor, y_anchor = int((x_min + x_max) / 2), y_max
+            x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
 
             if track_id not in self._track_colors:
                 self.logger.info(f'Event - new object\t\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
@@ -122,13 +122,17 @@ class VideoProcessor:
                 # TODO: Add frame with detected object.
 
                 self._track_colors[track_id] = random_color()
-                self._events.append({'timestamp': datetime.now(), 'event_name': 'new object',
-                                    'track_id': track_id, 'position': (x_anchor, y_anchor)})
+                self._events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
+                                     'event_name': 'new object',
+                                     'track_id': int(track_id),
+                                     'position': (x_anchor, y_anchor)})
 
             if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
                 self.logger.info(f'Event - line intersection\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
-                self._events.append({'timestamp': datetime.now(), 'event_name': 'line intersection',
-                                    'track_id': track_id, 'position': (x_anchor, y_anchor)})
+                self._events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
+                                     'event_name': 'line intersection',
+                                     'track_id': int(track_id),
+                                     'position': (x_anchor, y_anchor)})
 
             # TODO: Anchor point thickness scaling.
 
