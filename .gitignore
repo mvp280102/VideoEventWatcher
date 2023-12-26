@@ -5,4 +5,6 @@ logs
 inputs
 outputs
 
+__pycache__
+
 requirements.txt
