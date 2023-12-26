@@ -1,4 +1,5 @@
 import cv2
+import time
 import torch
 import asyncio
 
@@ -14,11 +15,10 @@ from bytetracker import BYTETracker
 from utils import create_logger, get_line_coefficients, filter_detections, random_color
 
 
-# TODO: Inference time.
 class VideoProcessor:
     logger = create_logger(__name__)
 
-    def __init__(self, model_name, checkpoints_dir, input_size=None, frames_skip=None, line_data=None, filter_label=0):
+    def __init__(self, model_name, checkpoints_dir, input_size=None, line_data=None, frames_skip=0, filter_label=0):
         self.reader, self.writer = None, None
         self.total_frames, self.fps = None, None
         self.frame_width, self.frame_height = None, None
@@ -67,8 +67,14 @@ class VideoProcessor:
             if self.frames_skip and index % (self.frames_skip + 1):
                 continue
 
-            # self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
+            self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
+            start = time.time()
+
             processed_frame = await self._process_frame(raw_frame, self.filter_label)
+
+            stop = time.time()
+            self.logger.debug(f'Processed in {round(stop - start, 4)} sec.')
+
             self.writer.write(processed_frame)
 
         self.reader.release()
