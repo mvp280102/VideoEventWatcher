@@ -12,13 +12,16 @@ from yolox.data.data_augment import ValTransform
 
 from bytetracker import BYTETracker
 
-from utils import create_logger, get_line_coefficients, filter_detections, random_color
+from sender import EventSender
+from utils import async_enumerate, create_logger, get_line_coefficients, filter_detections, random_color
 
 
-class VideoProcessor:
+class FrameProcessor:
     logger = create_logger(__name__)
 
     def __init__(self, model_name, checkpoints_dir, input_size=None, line_data=None, frames_skip=0, filter_label=0):
+        self.sender = EventSender(queue_name='vew_events')
+
         self.reader, self.writer = None, None
         self.total_frames, self.fps = None, None
         self.frame_width, self.frame_height = None, None
@@ -42,7 +45,6 @@ class VideoProcessor:
 
         self.tracker = BYTETracker()
         self._track_colors = {}
-        self._events = []
 
         self.frames_skip = frames_skip
         self.line_data = line_data
@@ -63,24 +65,25 @@ class VideoProcessor:
         self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=self.fps,
                                       frameSize=(self.frame_width, self.frame_height))
 
-        for index, raw_frame in enumerate(self._read_frame()):
+        async for index, raw_frame in async_enumerate(self._read_frame()):
             if self.frames_skip and index % (self.frames_skip + 1):
                 continue
 
             self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
             start = time.time()
 
-            processed_frame = await self._process_frame(raw_frame, self.filter_label)
+            processed_frame, detected_events = await self._process_frame(raw_frame, self.filter_label)
 
             stop = time.time()
             self.logger.debug(f'Processed in {round(stop - start, 4)} sec.')
 
             self.writer.write(processed_frame)
+            self.sender.send_events(detected_events)
 
         self.reader.release()
         self.writer.release()
 
-    def _read_frame(self):
+    async def _read_frame(self):
         while self.reader.isOpened():
             ret, frame = self.reader.read()
 
@@ -112,6 +115,8 @@ class VideoProcessor:
             line_k, line_b = get_line_coefficients(*self.line_data)
             frame = self._draw_line(frame, line_k, line_b)
 
+        events = []
+
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
             x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
@@ -122,17 +127,17 @@ class VideoProcessor:
                 # TODO: Add frame with detected object.
 
                 self._track_colors[track_id] = random_color()
-                self._events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
-                                     'event_name': 'new object',
-                                     'track_id': int(track_id),
-                                     'position': (x_anchor, y_anchor)})
+                events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
+                               'event_name': 'new object',
+                               'track_id': int(track_id),
+                               'position': (x_anchor, y_anchor)})
 
             if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
                 self.logger.info(f'Event - line intersection\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
-                self._events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
-                                     'event_name': 'line intersection',
-                                     'track_id': int(track_id),
-                                     'position': (x_anchor, y_anchor)})
+                events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
+                               'event_name': 'line intersection',
+                               'track_id': int(track_id),
+                               'position': (x_anchor, y_anchor)})
 
             # TODO: Anchor point thickness scaling.
 
@@ -145,7 +150,7 @@ class VideoProcessor:
             frame = cv2.rectangle(frame, (x_max, y_max), (x_min, y_min), color, thickness)
             frame = cv2.putText(frame, f'{track_id}', (x_min, y_min - 10), font, scale, color, thickness)
 
-        return frame
+        return frame, events
 
     def _prepare_frame(self, frame):
         frame = ValTransform()(frame, None, self.input_size)[0]
@@ -169,7 +174,3 @@ class VideoProcessor:
         thickness = 4
 
         return cv2.line(frame, point1, point2, color, thickness)
-
-    @property
-    def events(self):
-        return self._events
