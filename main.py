@@ -9,8 +9,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 
-from processor import VideoProcessor
-from sender import EventSender
+from processor import FrameProcessor
 from saver import EventSaver
 
 from credentials import *
@@ -55,15 +54,10 @@ async def process_video(filename: str):
 
     input_path = join(inputs.directory, filename)
 
-    processor = VideoProcessor(model_name, checkpoints_path, input_size, line_data, frames_skip, filter_label)
+    processor = FrameProcessor(model_name, checkpoints_path, input_size, line_data, frames_skip, filter_label)
     await processor.process_video(input_path)
 
-    # TODO: Add concurrency for messages producing and consuming.
-
-    sender = EventSender('vew_events')
-    sender.send_events(processor.events)
-
-    return RedirectResponse(url=f'/save?filename={filename}')
+    # return RedirectResponse(url=f'/save?filename={filename}')
 
 
 @app.post('/save')
@@ -72,4 +66,4 @@ async def save_events(filename: str):
     queue_name = 'vew_events'
 
     saver = EventSaver(database_url, queue_name)
-    saver.save_events(filename)
+    await saver.save_events(filename)
