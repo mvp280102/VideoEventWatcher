@@ -1,8 +1,15 @@
 from torch import stack
 from random import randint
+from itertools import count
 from math import tan, radians
 from datetime import datetime
 from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
+
+
+async def async_enumerate(async_iterable):
+    index = count()
+    async for item in async_iterable:
+        yield next(index), item
 
 
 # TODO: Params for stream and file handlers.
