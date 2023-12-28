@@ -1,5 +1,3 @@
-import cv2
-import time
 import torch
 import asyncio
 
@@ -12,28 +10,21 @@ from yolox.data.data_augment import ValTransform
 
 from bytetracker import BYTETracker
 
-from sender import EventSender
-from utils import async_enumerate, create_logger, get_line_coefficients, filter_detections, random_color
+from utils import create_logger, get_line_coefficients, filter_detections
 
 
 class FrameProcessor:
     logger = create_logger(__name__)
 
-    def __init__(self, model_name, checkpoints_dir, input_size=None, line_data=None, frames_skip=0, filter_label=0):
-        self.sender = EventSender(queue_name='vew_events')
-
-        self.reader, self.writer = None, None
-        self.total_frames, self.fps = None, None
-        self.frame_width, self.frame_height = None, None
-
+    def __init__(self, config, frame_size, line_data):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        checkpoint_path = join(checkpoints_dir, model_name + '.pth')
+        checkpoint_path = join(config.ckpt_dir, config.model_name + '.pth')
         checkpoint = torch.load(str(checkpoint_path), map_location=self.device)
 
-        detector_exp = get_exp(exp_name=model_name)
+        detector_exp = get_exp(exp_name=config.model_name)
 
-        self.input_size = input_size if input_size else detector_exp.input_size
+        self.input_size = config.input_size if 'input_size' in config else detector_exp.input_size
         self.num_classes = detector_exp.num_classes
         self.conf_thresh = detector_exp.test_conf
         self.nms_thresh = detector_exp.nmsthre
@@ -44,59 +35,14 @@ class FrameProcessor:
         self.detector.load_state_dict(checkpoint['model'])
 
         self.tracker = BYTETracker()
-        self._track_colors = {}
+        self.total_tracks = set()
 
-        self.frames_skip = frames_skip
+        self.frame_width, self.frame_height = frame_size
         self.line_data = line_data
-        self.filter_label = filter_label
 
-    async def process_video(self, input_path):
-        self.reader = cv2.VideoCapture(input_path)
-
-        self.total_frames = int(self.reader.get(cv2.CAP_PROP_FRAME_COUNT) / 2)
-        self.fps = int(self.reader.get(cv2.CAP_PROP_FPS))
-
-        self.frame_width = int(self.reader.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_height = int(self.reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        output_path = input_path.replace('inputs', 'outputs')
-        fourcc = cv2.VideoWriter.fourcc(*'XVID')
-
-        self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=self.fps,
-                                      frameSize=(self.frame_width, self.frame_height))
-
-        async for index, raw_frame in async_enumerate(self._read_frame()):
-            if self.frames_skip and index % (self.frames_skip + 1):
-                continue
-
-            self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
-            start = time.time()
-
-            processed_frame, detected_events = await self._process_frame(raw_frame, self.filter_label)
-
-            stop = time.time()
-            self.logger.debug(f'Processed in {round(stop - start, 4)} sec.')
-
-            self.writer.write(processed_frame)
-            self.sender.send_events(detected_events)
-
-        self.reader.release()
-        self.writer.release()
-
-    async def _read_frame(self):
-        while self.reader.isOpened():
-            ret, frame = self.reader.read()
-
-            if ret:
-                yield frame
-            else:
-                break
-
-    async def _process_frame(self, frame, label):
-        input_frame = self._prepare_frame(frame)
-
+    async def get_tracks(self, frame, label):
         with torch.no_grad():
-            raw_detections = self.detector(input_frame)
+            raw_detections = self.detector(self._prepare_frame(frame))
 
         # to release GIL:
         await asyncio.sleep(0.05)
@@ -109,24 +55,24 @@ class FrameProcessor:
 
         tracks = self.tracker.update(filtered_detections, None)
 
+        return tracks
+
+    # TODO: Refactor event log format.
+    def get_events(self, tracks):
         line_k, line_b = None, None
+        events = []
 
         if self.line_data:
             line_k, line_b = get_line_coefficients(*self.line_data)
-            frame = self._draw_line(frame, line_k, line_b)
-
-        events = []
 
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
             x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
 
-            if track_id not in self._track_colors:
+            if track_id not in self.total_tracks:
                 self.logger.info(f'Event - new object\t\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
 
-                # TODO: Add frame with detected object.
-
-                self._track_colors[track_id] = random_color()
+                self.total_tracks.add(track_id)
                 events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
                                'event_name': 'new object',
                                'track_id': int(track_id),
@@ -139,18 +85,7 @@ class FrameProcessor:
                                'track_id': int(track_id),
                                'position': (x_anchor, y_anchor)})
 
-            # TODO: Anchor point thickness scaling.
-
-            font = cv2.FONT_HERSHEY_DUPLEX
-            scale = 1
-            color = self._track_colors[track_id]
-            thickness = 2
-
-            frame = cv2.circle(frame, (int(x_anchor), y_anchor), thickness * 2, color, -1)
-            frame = cv2.rectangle(frame, (x_max, y_max), (x_min, y_min), color, thickness)
-            frame = cv2.putText(frame, f'{track_id}', (x_min, y_min - 10), font, scale, color, thickness)
-
-        return frame, events
+        return events
 
     def _prepare_frame(self, frame):
         frame = ValTransform()(frame, None, self.input_size)[0]
@@ -158,19 +93,3 @@ class FrameProcessor:
         frame = frame.cuda() if self.device == 'cuda' else frame.cpu()
 
         return frame
-
-    def _draw_line(self, frame, k, b):
-        x1 = -b / k
-        y1 = b
-
-        point1 = (int(x1), 0) if x1 > 0 else (0, int(y1))
-
-        x2 = (self.frame_height - b) / k
-        y2 = k * self.frame_width + b
-
-        point2 = (int(x2), self.frame_height) if x2 > 0 else (self.frame_width, int(y2))
-
-        color = (255, 255, 255)
-        thickness = 4
-
-        return cv2.line(frame, point1, point2, color, thickness)
