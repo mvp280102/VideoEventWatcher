@@ -9,13 +9,11 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 
-from processor import FrameProcessor
+# from processor import FrameProcessor
+from watcher import EventWatcher
 from saver import EventSaver
 
 from credentials import *
-
-
-MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 inputs = StaticFiles(directory='inputs')
@@ -32,11 +30,6 @@ async def upload_file(file_object: UploadFile = File(...)):
 
     async with open(file_path, 'wb') as buffer:
         content = await file_object.read()
-
-        if len(content) >= MAX_FILE_SIZE:
-            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                                detail=f'File is too large. Size limit is {int(MAX_FILE_SIZE / (1024 * 1024))} MB.')
-
         await buffer.write(content)
         await buffer.close()
 
@@ -54,8 +47,11 @@ async def process_video(filename: str):
 
     input_path = join(inputs.directory, filename)
 
-    processor = FrameProcessor(model_name, checkpoints_path, input_size, line_data, frames_skip, filter_label)
-    await processor.process_video(input_path)
+    watcher = EventWatcher(frames_skip, filter_label)
+    await watcher.watch_events(input_path)
+
+    # processor = FrameProcessor(model_name, checkpoints_path, input_size, line_data, frames_skip, filter_label)
+    # await processor.process_video(input_path)
 
     # return RedirectResponse(url=f'/save?filename={filename}')
 
