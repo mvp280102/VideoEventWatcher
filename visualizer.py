@@ -4,7 +4,7 @@ from utils import random_color
 
 
 class FrameVisualizer:
-    def __init__(self, frame_size, line_data=None):
+    def __init__(self, frame_size, line_data):
         self.frame_width, self.frame_height = frame_size
         self.line_data = line_data
         self._track_colors = {}
