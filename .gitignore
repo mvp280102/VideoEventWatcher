@@ -4,6 +4,7 @@
 logs
 inputs
 outputs
+configs
 
 __pycache__
 
