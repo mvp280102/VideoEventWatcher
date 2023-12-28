@@ -30,14 +30,17 @@ class Event(BaseModel):
 class EventSaver:
     logger = create_logger(__name__)
 
-    def __init__(self, database_url, queue_name, host_name='localhost', timeout=1.0):
+    def __init__(self, config):
+        # TODO: Refactor with format string.
+        database_url = f'{config.sql_dialect}+{config.db_driver}://{config.db_user}:{config.db_user_password}@{config.host_name}/{config.db_name}'
+
         self.engine = create_engine(database_url)
         BaseModel.metadata.create_all(bind=self.engine)
         register_adapter(numpy.int64, lambda int64: AsIs(int64))
 
-        self.queue_name = queue_name
-        self.host_name = host_name
-        self.timeout = timeout
+        self.timeout = config.timeout
+        self.queue_name = config.queue_name
+        self.host_name = config.host_name
 
     async def save_events(self, filename):
         connection = BlockingConnection(ConnectionParameters(host=self.host_name))
@@ -54,7 +57,7 @@ class EventSaver:
 
             raw_event = json.loads(body)
 
-            self.logger.info(f'Receive event message {raw_event} from message queue.')
+            self.logger.info(f'Receive event message {raw_event} from "{self.queue_name}" queue.')
 
             raw_event['filename'] = filename
 
