@@ -1,65 +1,59 @@
 # TODO: Remove temporary file.
+# TODO: Optimize configs structure.
 
 
 from os.path import join
 from aiofiles import open
+from omegaconf import OmegaConf
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, status
+from fastapi import FastAPI, File, UploadFile
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 
-# from processor import FrameProcessor
 from watcher import EventWatcher
 from saver import EventSaver
-
-from credentials import *
 
 
 inputs = StaticFiles(directory='inputs')
 outputs = StaticFiles(directory='outputs')
+configs = StaticFiles(directory='configs')
 
 app = FastAPI()
 app.mount('/inputs', inputs, name='inputs')
 app.mount('/outputs', outputs, name='outputs')
+app.mount('/configs', configs, name='configs')
 
 
+# TODO: Optimize videos and configs location.
 @app.post('/upload', response_class=RedirectResponse)
-async def upload_file(file_object: UploadFile = File(...)):
-    file_path = join(inputs.directory, file_object.filename)
+async def upload_data(config_object: UploadFile = File(...), video_object: UploadFile = File(...)):
+    config_path = join(configs.directory, config_object.filename)
+    video_path = join(inputs.directory, video_object.filename)
 
-    async with open(file_path, 'wb') as buffer:
-        content = await file_object.read()
+    async with open(video_path, 'wb') as buffer:
+        content = await video_object.read()
         await buffer.write(content)
         await buffer.close()
 
-    return RedirectResponse(url=f'/process?filename={file_object.filename}')
+    return RedirectResponse(url=f'/process?config_path={config_path}&video_path={video_path}')
 
 
 @app.post('/process', response_class=RedirectResponse)
-async def process_video(filename: str):
-    model_name = 'yolox_x'
-    checkpoints_path = join('/', 'home', 'mvp280102', 'models', 'yolox')
-    input_size = (480, 480)
-    line_data = (10, (0, 450))
-    frames_skip = 0
-    filter_label = 0
+async def process_video(config_path: str, video_path: str):
+    config = OmegaConf.load(config_path)
 
-    input_path = join(inputs.directory, filename)
-
-    watcher = EventWatcher(frames_skip, filter_label)
-    await watcher.watch_events(input_path)
-
-    # processor = FrameProcessor(model_name, checkpoints_path, input_size, line_data, frames_skip, filter_label)
-    # await processor.process_video(input_path)
+    watcher = EventWatcher(config.watcher)
+    await watcher.watch_events(video_path)
 
     # return RedirectResponse(url=f'/save?filename={filename}')
 
 
+# TODO: Remove filename param.
 @app.post('/save')
-async def save_events(filename: str):
-    database_url = f'{sql_dialect}+{db_driver}://{db_user}:{db_user_password}@{host_name}/{db_name}'
-    queue_name = 'vew_events'
+async def save_events(filename: str, config_object: UploadFile = File(...)):
+    config_path = join(configs.directory, config_object.filename)
+    config = OmegaConf.load(config_path)
 
-    saver = EventSaver(database_url, queue_name)
+    saver = EventSaver(config.saver)
     await saver.save_events(filename)
