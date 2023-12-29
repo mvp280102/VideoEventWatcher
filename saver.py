@@ -24,7 +24,6 @@ class Event(BaseModel):
     track_id = Column(INTEGER, nullable=False)
     position = Column(ARRAY(item_type=INTEGER, as_tuple=True), nullable=False)
     filename = Column(VARCHAR(length=64), nullable=False)
-    frame_path = Column(VARCHAR(length=256), nullable=True)
 
 
 class EventSaver:
@@ -42,7 +41,7 @@ class EventSaver:
         self.queue_name = config.queue_name
         self.host_name = config.host_name
 
-    async def save_events(self, filename):
+    async def save_events(self):
         connection = BlockingConnection(ConnectionParameters(host=self.host_name))
         channel = connection.channel()
         channel.queue_declare(queue=self.queue_name, durable=True)
@@ -58,8 +57,6 @@ class EventSaver:
             raw_event = json.loads(body)
 
             self.logger.info("Receive event message {} from '{}' queue.".format(raw_event, self.queue_name))
-
-            raw_event['filename'] = filename
 
             with Session(autoflush=False, bind=self.engine) as session:
                 event = Event(**raw_event)
