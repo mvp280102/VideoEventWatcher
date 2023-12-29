@@ -22,7 +22,7 @@ def create_logger(name, level=INFO):
 
     stream_handler = StreamHandler()
     file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(datetime_format.replace(" ", "_"))}.log')
-    formatter = Formatter(fmt='{levelname}:\t{name:<10}\t{asctime:<20}\t{message}', datefmt=datetime_format, style='{')
+    formatter = Formatter(fmt='{levelname}:\t{name:<12}{asctime:<24}{message}', datefmt=datetime_format, style='{')
 
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
