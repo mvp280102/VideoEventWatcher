@@ -1,6 +1,8 @@
 import cv2
 import time
 
+from collections import defaultdict
+
 from processor import FrameProcessor
 from visualizer import FrameVisualizer
 from sender import EventSender
@@ -38,6 +40,8 @@ class EventWatcher:
         visualizer = FrameVisualizer((self.frame_width, self.frame_height), line_data)
         sender = EventSender(self.config.sender.queue_name, self.config.sender.host_name)
 
+        total_stats = defaultdict()
+
         async for index, frame in async_enumerate(self._read_frame()):
             if self.config.frames_skip and index % (self.config.frames_skip + 1):
                 continue
@@ -50,8 +54,11 @@ class EventWatcher:
             stop = time.time()
             self.logger.debug(f'Processed in {round(stop - start, 4)} sec.')
 
-            events = processor.get_events(tracks)
+            events, stats = processor.get_events(tracks)
             sender.send_events(events)
+
+            for key in stats:
+                total_stats[key] += stats[key]
 
             if line_data:
                 frame = visualizer.draw_line(frame, *get_line_coefficients(*line_data))
