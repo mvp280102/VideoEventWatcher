@@ -32,11 +32,10 @@ async def process_video(config_object: UploadFile = File(...), video_object: Upl
     await watcher.watch_events(video_path)
 
 
-# TODO: Remove filename param.
 @app.post('/save', status_code=status.HTTP_201_CREATED)
-async def save_events(filename: str, config_object: UploadFile = File(...)):
+async def save_events(config_object: UploadFile = File(...)):
     config_path = join(configs.directory, config_object.filename)
     config = OmegaConf.load(config_path)
 
     saver = EventSaver(config.saver)
-    await saver.save_events(filename)
+    await saver.save_events()
