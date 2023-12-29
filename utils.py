@@ -5,6 +5,8 @@ from math import tan, radians
 from datetime import datetime
 from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
 
+from constants import datetime_format
+
 
 async def async_enumerate(async_iterable):
     index = count()
@@ -19,8 +21,8 @@ def create_logger(name, level=INFO):
     logger.propagate = False
 
     stream_handler = StreamHandler()
-    file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime("%d.%m.%Y_%H:%M:%S")}.log')
-    formatter = Formatter(fmt='%(levelname)s:\t%(name)-10s\t%(asctime)-20s\t%(message)s', datefmt='%d.%m.%Y %H:%M:%S')
+    file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(datetime_format.replace(" ", "_"))}.log')
+    formatter = Formatter(fmt='{levelname}:\t{name:<10}\t{asctime:<20}\t{message}', datefmt=datetime_format, style='{')
 
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)

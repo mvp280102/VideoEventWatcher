@@ -10,6 +10,7 @@ from yolox.data.data_augment import ValTransform
 
 from bytetracker import BYTETracker
 
+from constants import datetime_format
 from utils import create_logger, get_line_coefficients, filter_detections
 
 
@@ -60,7 +61,6 @@ class FrameProcessor:
     def get_events(self, tracks):
         line_k, line_b = None, None
 
-        datetime_format = '%Y.%m.%d %H:%M:%S'
         event_keys = ('timestamp', 'event_name', 'track_id', 'position')
         stat_keys = ('new object', 'line intersection')
 
@@ -76,7 +76,7 @@ class FrameProcessor:
             timestamp = datetime.now().strftime(datetime_format)
 
             if track_id not in self.total_tracks:
-                self.logger.info(f"New object with track ID {track_id} at position ({x_anchor}, {y_anchor}).")
+                self.logger.info("New object with track ID {} at position ({}, {}).".format(track_id, x_anchor, y_anchor))
                 self.total_tracks.add(track_id)
 
                 event_name = 'new object'
@@ -85,7 +85,7 @@ class FrameProcessor:
                 stats[event_name] += 1
 
             if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
-                self.logger.info(f"Line intersection by object with track ID {track_id} at position ({x_anchor}, {y_anchor}).")
+                self.logger.info("Line intersection by object with track ID {} at position ({}, {}).".format(track_id, x_anchor, y_anchor))
 
                 event_name = 'line intersection'
                 event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))

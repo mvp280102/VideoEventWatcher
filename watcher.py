@@ -40,19 +40,19 @@ class EventWatcher:
         visualizer = FrameVisualizer((self.frame_width, self.frame_height), line_data)
         sender = EventSender(self.config.sender.queue_name, self.config.sender.host_name)
 
-        total_stats = defaultdict()
+        total_stats = defaultdict(lambda: 0)
 
         async for index, frame in async_enumerate(self._read_frame()):
             if self.config.frames_skip and index % (self.config.frames_skip + 1):
                 continue
 
-            self.logger.debug(f"Processing frame {index} of {self.total_frames}...")
+            self.logger.debug("Processing frame {} of {}...".format(index, self.total_frames))
             start = time.time()
 
             tracks = await processor.get_tracks(frame, self.config.filter_label)
 
             stop = time.time()
-            self.logger.debug(f"Processed in {round(stop - start, 4)} sec.")
+            self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)
@@ -69,6 +69,8 @@ class EventWatcher:
             # TODO: Add frame with detected object.
 
             self.writer.write(frame)
+
+        self.logger.info("Detected {} new objects and {} line intersections.".format(*total_stats.values()))
 
         self.reader.release()
         self.writer.release()
