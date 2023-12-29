@@ -57,10 +57,15 @@ class FrameProcessor:
 
         return tracks
 
-    # TODO: Refactor event log format.
     def get_events(self, tracks):
         line_k, line_b = None, None
+
+        datetime_format = '%Y.%m.%d %H:%M:%S'
+        event_keys = ('timestamp', 'event_name', 'track_id', 'position')
+        stat_keys = ('new object', 'line intersection')
+
         events = []
+        stats = dict.fromkeys(stat_keys, 0)
 
         if self.line_data:
             line_k, line_b = get_line_coefficients(*self.line_data)
@@ -68,24 +73,26 @@ class FrameProcessor:
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
             x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
+            timestamp = datetime.now().strftime(datetime_format)
 
             if track_id not in self.total_tracks:
-                self.logger.info(f'Event - new object\t\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
-
+                self.logger.info(f'New object with track ID {track_id} at position ({x_anchor}, {y_anchor}).')
                 self.total_tracks.add(track_id)
-                events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
-                               'event_name': 'new object',
-                               'track_id': int(track_id),
-                               'position': (x_anchor, y_anchor)})
+
+                event_name = 'new object'
+                event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
+                events.append(dict(zip(event_keys, event_values)))
+                stats[event_name] += 1
 
             if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
-                self.logger.info(f'Event - line intersection\tTrack ID - {track_id}\t\tPosition - ({x_anchor}, {y_anchor})')
-                events.append({'timestamp': datetime.now().strftime('%Y.%m.%d %H:%M:%S'),
-                               'event_name': 'line intersection',
-                               'track_id': int(track_id),
-                               'position': (x_anchor, y_anchor)})
+                self.logger.info(f'Line intersection by object with track ID {track_id} at position ({x_anchor}, {y_anchor}).')
 
-        return events
+                event_name = 'line intersection'
+                event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
+                events.append(dict(zip(event_keys, event_values)))
+                stats[event_name] += 1
+
+        return events, stats
 
     def _prepare_frame(self, frame):
         frame = ValTransform()(frame, None, self.input_size)[0]
