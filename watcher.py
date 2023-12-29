@@ -46,13 +46,13 @@ class EventWatcher:
             if self.config.frames_skip and index % (self.config.frames_skip + 1):
                 continue
 
-            self.logger.debug(f'Processing frame {index} of {self.total_frames}...')
+            self.logger.debug(f"Processing frame {index} of {self.total_frames}...")
             start = time.time()
 
             tracks = await processor.get_tracks(frame, self.config.filter_label)
 
             stop = time.time()
-            self.logger.debug(f'Processed in {round(stop - start, 4)} sec.')
+            self.logger.debug(f"Processed in {round(stop - start, 4)} sec.")
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)

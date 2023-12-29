@@ -57,7 +57,7 @@ class EventSaver:
 
             raw_event = json.loads(body)
 
-            self.logger.info(f'Receive event message {raw_event} from "{self.queue_name}" queue.')
+            self.logger.info(f"Receive event message {raw_event} from '{self.queue_name}' queue.")
 
             raw_event['filename'] = filename
 
@@ -65,7 +65,7 @@ class EventSaver:
                 event = Event(**raw_event)
                 session.add(event)
                 session.commit()
-                self.logger.info(f'Write event object {event} to database.')
+                self.logger.info(f"Write event object {event} to database.")
 
             channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 

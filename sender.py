@@ -21,7 +21,7 @@ class EventSender:
         channel.queue_declare(queue=self.queue_name, durable=True)
 
         for event in events:
-            self.logger.info(f'Send event message {event} to "{self.queue_name}" queue.')
+            self.logger.info(f"Send event message {event} to \'{self.queue_name}\' queue.")
             channel.basic_publish(exchange='', routing_key=self.queue_name, body=json.dumps(event),
                                   properties=BasicProperties(delivery_mode=DeliveryMode.Persistent))
 
