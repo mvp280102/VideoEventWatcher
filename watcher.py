@@ -1,6 +1,7 @@
 import cv2
 import time
 
+from os.path import basename
 from collections import defaultdict
 
 from processor import FrameProcessor
@@ -38,7 +39,7 @@ class EventWatcher:
 
         processor = FrameProcessor(self.config.processor, (self.frame_width, self.frame_height), line_data)
         visualizer = FrameVisualizer((self.frame_width, self.frame_height), line_data)
-        sender = EventSender(self.config.sender.queue_name, self.config.sender.host_name)
+        sender = EventSender(basename(input_path), self.config.sender.queue_name, self.config.sender.host_name)
 
         total_stats = defaultdict(lambda: 0)
 
@@ -65,8 +66,6 @@ class EventWatcher:
 
             for track in tracks:
                 frame = visualizer.draw_bounding_box(frame, track)
-
-            # TODO: Add frame with detected object.
 
             self.writer.write(frame)
 

@@ -8,7 +8,8 @@ from utils import create_logger
 class EventSender:
     logger = create_logger(__name__)
 
-    def __init__(self, queue_name, host_name):
+    def __init__(self, file_name, queue_name, host_name):
+        self.file_name = file_name
         self.queue_name = queue_name
         self.host_name = host_name
 
@@ -21,6 +22,7 @@ class EventSender:
         channel.queue_declare(queue=self.queue_name, durable=True)
 
         for event in events:
+            event.update({'filename': self.file_name})
             self.logger.info("Send event message {} to \'{}\' queue.".format(event, self.queue_name))
             channel.basic_publish(exchange='', routing_key=self.queue_name, body=json.dumps(event),
                                   properties=BasicProperties(delivery_mode=DeliveryMode.Persistent))
