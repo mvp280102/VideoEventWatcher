@@ -5,6 +5,7 @@ from os.path import join
 from omegaconf import OmegaConf
 
 from fastapi import FastAPI, status, File, UploadFile
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from watcher import EventWatcher
@@ -19,6 +20,11 @@ app = FastAPI()
 app.mount('/inputs', inputs, name='inputs')
 app.mount('/outputs', outputs, name='outputs')
 app.mount('/configs', configs, name='configs')
+
+
+@app.get('/', response_class=RedirectResponse)
+async def docs_redirect():
+    return RedirectResponse(url='/docs')
 
 
 @app.post('/process', status_code=status.HTTP_204_NO_CONTENT)
