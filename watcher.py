@@ -1,7 +1,7 @@
 import cv2
 import time
 
-from os.path import basename
+from os.path import join
 from collections import defaultdict
 
 from processor import FrameProcessor
@@ -21,8 +21,11 @@ class EventWatcher:
         self.total_frames, self.fps = None, None
         self.frame_width, self.frame_height = None, None
 
-    async def watch_events(self, input_path):
-        self.reader = cv2.VideoCapture(input_path)
+    async def watch_events(self, file_name):
+        input_path = join(self.config.inputs_dir, file_name)
+        output_path = join(self.config.outputs_dir, file_name)
+
+        self.reader = cv2.VideoCapture(str(input_path))
 
         self.total_frames = int(self.reader.get(cv2.CAP_PROP_FRAME_COUNT) / 2)
         self.fps = int(self.reader.get(cv2.CAP_PROP_FPS))
@@ -30,20 +33,17 @@ class EventWatcher:
         self.frame_width = int(self.reader.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        output_path = input_path.replace('inputs', 'outputs')
-        tracks_path = input_path.replace('inputs', 'tracks').replace('.avi', '.csv')
-
         fourcc = cv2.VideoWriter.fourcc(*'XVID')
 
-        self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=self.fps,
+        self.writer = cv2.VideoWriter(filename=str(output_path), fourcc=fourcc, fps=self.fps,
                                       frameSize=(self.frame_width, self.frame_height))
 
         line_data = self.config.line_data if 'line_data' in self.config else None
 
         processor = FrameProcessor(self.config.processor, (self.frame_width, self.frame_height), line_data)
         visualizer = EventVisualizer((self.frame_width, self.frame_height), line_data)
-        extractor = EventExtractor(tracks_path)
-        sender = EventSender(basename(input_path), self.config.sender.queue_name, self.config.sender.host_name)
+        extractor = EventExtractor(self.config.extractor, input_path)
+        sender = EventSender(file_name, self.config.sender.queue_name, self.config.sender.host_name)
 
         total_stats = defaultdict(lambda: 0)
 
