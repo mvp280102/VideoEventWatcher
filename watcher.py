@@ -7,7 +7,7 @@ from collections import defaultdict
 from processor import FrameProcessor
 from visualizer import FrameVisualizer
 from sender import EventSender
-from utils import async_enumerate, create_logger, get_line_coefficients
+from utils import async_enumerate, create_logger
 
 
 class EventWatcher:
@@ -61,11 +61,7 @@ class EventWatcher:
             for key in stats:
                 total_stats[key] += stats[key]
 
-            if line_data:
-                frame = visualizer.draw_line(frame, *get_line_coefficients(*line_data))
-
-            for track in tracks:
-                frame = visualizer.draw_bounding_box(frame, track)
+            frame = visualizer.draw_annotations(frame, tracks)
 
             self.writer.write(frame)
 
