@@ -1,16 +1,26 @@
 import cv2
 
-from utils import random_color
+from utils import get_line_coefficients, random_color
 
 
+# TODO: Config for visualizer (bbs and line params).
 class FrameVisualizer:
     def __init__(self, frame_size, line_data):
         self.frame_width, self.frame_height = frame_size
         self.line_data = line_data
         self._track_colors = {}
 
-    def draw_bounding_box(self, frame, track):
-        x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
+    def draw_annotations(self, frame, tracks):
+        if self.line_data:
+            frame = self._draw_line(frame, *get_line_coefficients(*self.line_data))
+
+        for track in tracks:
+            frame = self._draw_bounding_box(frame, track)
+
+        return frame
+
+    def _draw_bounding_box(self, frame, track):
+        x_min, y_min, x_max, y_max, track_id = track
         x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
 
         if track_id not in self._track_colors:
@@ -30,7 +40,7 @@ class FrameVisualizer:
 
         return frame
 
-    def draw_line(self, frame, line_k, line_b):
+    def _draw_line(self, frame, line_k, line_b):
         x1 = -line_b / line_k
         y1 = line_b
 
