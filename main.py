@@ -12,13 +12,9 @@ from watcher import EventWatcher
 from saver import EventSaver
 
 
-inputs = StaticFiles(directory='inputs')
-outputs = StaticFiles(directory='outputs')
 configs = StaticFiles(directory='configs')
 
 app = FastAPI()
-app.mount('/inputs', inputs, name='inputs')
-app.mount('/outputs', outputs, name='outputs')
 app.mount('/configs', configs, name='configs')
 
 
@@ -30,12 +26,10 @@ async def docs_redirect():
 @app.post('/process', status_code=status.HTTP_204_NO_CONTENT)
 async def process_video(config_object: UploadFile = File(...), video_object: UploadFile = File(...)):
     config_path = join(configs.directory, config_object.filename)
-    video_path = join(inputs.directory, video_object.filename)
-
     config = OmegaConf.load(config_path)
 
     watcher = EventWatcher(config.watcher)
-    await watcher.watch_events(video_path)
+    await watcher.watch_events(video_object.filename)
 
 
 @app.post('/save', status_code=status.HTTP_201_CREATED)
