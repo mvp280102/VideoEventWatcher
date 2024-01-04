@@ -2,10 +2,12 @@
 .venv
 
 logs
+tracks
 inputs
 outputs
 configs
 
 __pycache__
 
+draft.py
 requirements.txt
