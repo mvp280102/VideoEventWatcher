@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from processor import FrameProcessor
 from visualizer import FrameVisualizer
+from writer import TrackWriter
 from sender import EventSender
 from utils import async_enumerate, create_logger
 
@@ -30,6 +31,8 @@ class EventWatcher:
         self.frame_height = int(self.reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         output_path = input_path.replace('inputs', 'outputs')
+        tracks_path = input_path.replace('inputs', 'tracks').replace('.avi', '.csv')
+
         fourcc = cv2.VideoWriter.fourcc(*'XVID')
 
         self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=self.fps,
@@ -39,6 +42,7 @@ class EventWatcher:
 
         processor = FrameProcessor(self.config.processor, (self.frame_width, self.frame_height), line_data)
         visualizer = FrameVisualizer((self.frame_width, self.frame_height), line_data)
+        writer = TrackWriter(tracks_path)
         sender = EventSender(basename(input_path), self.config.sender.queue_name, self.config.sender.host_name)
 
         total_stats = defaultdict(lambda: 0)
@@ -54,6 +58,8 @@ class EventWatcher:
 
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
+
+            writer.write_tracks(index, tracks)
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)
