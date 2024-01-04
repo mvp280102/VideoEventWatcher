@@ -56,7 +56,7 @@ class FrameProcessor:
 
         tracks = self.tracker.update(filtered_detections, None)
 
-        return tracks
+        return tracks[:, :5].astype('int')
 
     def get_events(self, tracks):
         line_k, line_b = None, None
@@ -71,7 +71,7 @@ class FrameProcessor:
             line_k, line_b = get_line_coefficients(*self.line_data)
 
         for track in tracks:
-            x_min, y_min, x_max, y_max, track_id = track[:5].astype('int')
+            x_min, y_min, x_max, y_max, track_id = track
             x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
             timestamp = datetime.now().strftime(datetime_format)
 
