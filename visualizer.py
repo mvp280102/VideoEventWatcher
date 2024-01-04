@@ -4,7 +4,7 @@ from utils import get_line_coefficients, random_color
 
 
 # TODO: Config for visualizer (bbs and line params).
-class FrameVisualizer:
+class EventVisualizer:
     def __init__(self, frame_size, line_data):
         self.frame_width, self.frame_height = frame_size
         self.line_data = line_data

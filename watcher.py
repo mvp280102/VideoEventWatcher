@@ -5,8 +5,8 @@ from os.path import basename
 from collections import defaultdict
 
 from processor import FrameProcessor
-from visualizer import FrameVisualizer
-from writer import TrackWriter
+from visualizer import EventVisualizer
+from extractor import EventExtractor
 from sender import EventSender
 from utils import async_enumerate, create_logger
 
@@ -41,8 +41,8 @@ class EventWatcher:
         line_data = self.config.line_data if 'line_data' in self.config else None
 
         processor = FrameProcessor(self.config.processor, (self.frame_width, self.frame_height), line_data)
-        visualizer = FrameVisualizer((self.frame_width, self.frame_height), line_data)
-        writer = TrackWriter(tracks_path)
+        visualizer = EventVisualizer((self.frame_width, self.frame_height), line_data)
+        extractor = EventExtractor(tracks_path)
         sender = EventSender(basename(input_path), self.config.sender.queue_name, self.config.sender.host_name)
 
         total_stats = defaultdict(lambda: 0)
@@ -59,7 +59,7 @@ class EventWatcher:
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
 
-            writer.write_tracks(index, tracks)
+            extractor.write_tracks(index, tracks)
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)

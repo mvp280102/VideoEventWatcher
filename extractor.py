@@ -4,7 +4,7 @@ import numpy
 from utils import create_logger
 
 
-class TrackWriter:
+class EventExtractor:
     logger = create_logger(__name__)
 
     def __init__(self, file_name):
