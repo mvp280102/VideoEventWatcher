@@ -47,6 +47,8 @@ class EventWatcher:
 
         total_stats = defaultdict(lambda: 0)
 
+        await extractor.split_frames()
+
         async for index, frame in async_enumerate(self._read_frame()):
             if self.config.frames_skip and index % (self.config.frames_skip + 1):
                 continue
