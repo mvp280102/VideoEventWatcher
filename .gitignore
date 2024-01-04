@@ -2,7 +2,9 @@
 .venv
 
 logs
+frames
 tracks
+events
 inputs
 outputs
 configs
