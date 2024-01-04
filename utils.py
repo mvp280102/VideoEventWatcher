@@ -10,6 +10,7 @@ from constants import datetime_format
 
 async def async_enumerate(async_iterable):
     index = count()
+
     async for item in async_iterable:
         yield next(index), item
 
