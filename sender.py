@@ -23,7 +23,7 @@ class EventSender:
 
         for event in events:
             event.update({'filename': self.file_name})
-            self.logger.info("Send event message {} to \'{}\' queue.".format(event, self.queue_name))
+            self.logger.info("Send event message {} to '{}' queue.".format(event, self.queue_name))
             channel.basic_publish(exchange='', routing_key=self.queue_name, body=json.dumps(event),
                                   properties=BasicProperties(delivery_mode=DeliveryMode.Persistent))
 
