@@ -72,6 +72,8 @@ class EventExtractor:
         start_index = max(1, frame_index - SEC_BEFORE_EVENT * self.fps)
         end_index = min(self.total_frames, frame_index + SEC_AFTER_EVENT * self.fps)
 
+        self.logger.info("Extract event for object with track ID = {} at frame {}.".format(track_id, frame_index))
+
         for index in range(start_index, end_index):
             track = self.tracks.loc[(self.tracks['frame_index'] == index) & (self.tracks['track_id'] == track_id)]
 
