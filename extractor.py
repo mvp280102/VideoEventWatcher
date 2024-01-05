@@ -73,9 +73,11 @@ class EventExtractor:
         end_index = min(self.total_frames, frame_index + SEC_AFTER_EVENT * self.fps)
 
         for index in range(start_index, end_index):
-            frame = cv2.imread(join(self.frames_dir, '{}.png'.format(index)))
             track = self.tracks.loc[(self.tracks['frame_index'] == index) & (self.tracks['track_id'] == track_id)]
+
+            frame = cv2.imread(join(self.frames_dir, '{}.png'.format(index)))
             frame = visualizer.draw_annotations(frame, track.to_numpy()[:, 1:])
+
             writer.write(frame)
 
         writer.release()

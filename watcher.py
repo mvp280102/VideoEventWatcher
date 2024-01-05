@@ -9,6 +9,7 @@ from visualizer import EventVisualizer
 from extractor import EventExtractor
 from sender import EventSender
 from utils import async_enumerate, create_logger
+from constants import NEW_OBJECT, LINE_INTERSECTION
 
 
 class EventWatcher:
@@ -64,9 +65,8 @@ class EventWatcher:
             sender.send_events(events)
 
             for event in events:
-                # TODO: Num constants for events instead of str literals.
                 # TODO: Refactor events content, format and DB fields.
-                if event['event_name'] == 'line intersection':
+                if event['event_name'] == LINE_INTERSECTION:
                     extractor.register_event(index, event['track_id'])
 
             if extractor.is_ready(index):
