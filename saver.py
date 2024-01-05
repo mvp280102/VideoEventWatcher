@@ -1,6 +1,6 @@
 import json
-import numpy
 import asyncio
+import numpy as np
 
 from sqlalchemy import create_engine, Column, ARRAY, INTEGER, VARCHAR, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Session
@@ -20,10 +20,10 @@ class Event(BaseModel):
 
     event_id = Column(INTEGER, nullable=False, primary_key=True, autoincrement=True)
     timestamp = Column(TIMESTAMP(timezone=False), nullable=False)
-    event_name = Column(VARCHAR(length=64), nullable=False)
+    event_name = Column(VARCHAR(length=128), nullable=False)
     track_id = Column(INTEGER, nullable=False)
     position = Column(ARRAY(item_type=INTEGER, as_tuple=True), nullable=False)
-    filename = Column(VARCHAR(length=64), nullable=False)
+    file_path = Column(VARCHAR(length=128), nullable=False)
 
 
 class EventSaver:
@@ -35,7 +35,7 @@ class EventSaver:
 
         self.engine = create_engine(database_url)
         BaseModel.metadata.create_all(bind=self.engine)
-        register_adapter(numpy.int64, lambda int64: AsIs(int64))
+        register_adapter(np.int64, lambda int64: AsIs(int64))
 
         self.timeout = config.timeout
         self.queue_name = config.queue_name

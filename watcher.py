@@ -22,8 +22,8 @@ class EventWatcher:
         self.frame_width, self.frame_height = None, None
 
     async def watch_events(self, file_name):
-        input_path = join(self.config.inputs_dir, file_name)
-        output_path = join(self.config.outputs_dir, file_name)
+        input_path = join(self.config.inputs_root, file_name)
+        output_path = join(self.config.outputs_root, file_name)
 
         self.reader = cv2.VideoCapture(str(input_path))
 
@@ -43,7 +43,7 @@ class EventWatcher:
         processor = FrameProcessor(self.config.processor, (self.frame_width, self.frame_height), line_data)
         visualizer = EventVisualizer((self.frame_width, self.frame_height), line_data)
         extractor = EventExtractor(self.config.extractor, input_path)
-        sender = EventSender(file_name, self.config.sender.queue_name, self.config.sender.host_name)
+        sender = EventSender(self.config.sender, input_path)
 
         total_stats = defaultdict(lambda: 0)
 
@@ -61,7 +61,7 @@ class EventWatcher:
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
 
-            extractor.write_tracks(index, tracks)
+            extractor.save_tracks(index, tracks)
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)

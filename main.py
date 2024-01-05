@@ -1,6 +1,3 @@
-# TODO: Optimize configs structure.
-
-
 from os.path import join
 from omegaconf import OmegaConf
 
