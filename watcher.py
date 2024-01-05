@@ -39,7 +39,7 @@ class EventWatcher:
 
         processor = FrameProcessor(self.config.processor, frame_size, line_data)
         visualizer = EventVisualizer(frame_size, line_data)
-        extractor = EventExtractor(self.config.extractor, input_path, fourcc, fps, frame_size)
+        extractor = EventExtractor(self.config.extractor, input_path, total_frames, frame_size, line_data, fourcc, fps)
         sender = EventSender(self.config.sender, input_path)
 
         total_stats = defaultdict(lambda: 0)
@@ -62,6 +62,13 @@ class EventWatcher:
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)
+
+            for event in events:
+                if event['event_name'] == 'line intersection':
+                    extractor.register_event(index, event['track_id'])
+
+            if extractor.is_ready(index):
+                extractor.extract_event()
 
             for key in stats:
                 total_stats[key] += stats[key]
