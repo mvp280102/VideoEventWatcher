@@ -20,8 +20,8 @@ class FrameProcessor:
     def __init__(self, config, frame_size, line_data):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        checkpoint_path = join(config.ckpt_root, config.model_name + '.pth')
-        checkpoint = torch.load(str(checkpoint_path), map_location=self.device)
+        checkpoint_path = str(join(config.ckpt_root, config.model_name + '.pth'))
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
 
         detector_exp = get_exp(exp_name=config.model_name)
 

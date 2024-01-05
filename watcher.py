@@ -19,10 +19,10 @@ class EventWatcher:
         self.reader, self.writer = None, None
 
     async def watch_events(self, file_name):
-        input_path = join(self.config.inputs_root, file_name)
-        output_path = join(self.config.outputs_root, file_name)
+        input_path = str(join(self.config.inputs_root, file_name))
+        output_path = str(join(self.config.outputs_root, file_name))
 
-        self.reader = cv2.VideoCapture(str(input_path))
+        self.reader = cv2.VideoCapture(input_path)
 
         total_frames = int(self.reader.get(cv2.CAP_PROP_FRAME_COUNT) / 2)
         fps = int(self.reader.get(cv2.CAP_PROP_FPS))
@@ -33,7 +33,7 @@ class EventWatcher:
 
         fourcc = cv2.VideoWriter.fourcc(*'XVID')
 
-        self.writer = cv2.VideoWriter(filename=str(output_path), fourcc=fourcc, fps=fps, frameSize=frame_size)
+        self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=fps, frameSize=frame_size)
 
         line_data = self.config.line_data if 'line_data' in self.config else None
 
@@ -64,6 +64,8 @@ class EventWatcher:
             sender.send_events(events)
 
             for event in events:
+                # TODO: Num constants for events instead of str literals.
+                # TODO: Refactor events content, format and DB fields.
                 if event['event_name'] == 'line intersection':
                     extractor.register_event(index, event['track_id'])
 
