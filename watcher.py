@@ -61,7 +61,7 @@ class EventWatcher:
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
 
-            extractor.save_tracks(index, tracks)
+            extractor.snapshot_tracks(index, tracks)
 
             events, stats = processor.get_events(tracks)
             sender.send_events(events)
