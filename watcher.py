@@ -81,6 +81,8 @@ class EventWatcher:
 
         self.logger.info("Detected {} new objects and {} line intersections.".format(*total_stats.values()))
 
+        extractor.save_tracks()
+
         self.reader.release()
         self.writer.release()
 
