@@ -3,6 +3,7 @@ import asyncio
 
 from os.path import join
 from datetime import datetime
+from collections import Counter
 
 from yolox.exp import get_exp
 from yolox.utils import postprocess
@@ -63,8 +64,8 @@ class FrameProcessor:
 
         event_keys = ('timestamp', 'event_name', 'track_id', 'position')
 
-        events = []
-        stats = dict.fromkeys((NEW_OBJECT, LINE_INTERSECTION), 0)
+        event_data = []
+        event_names = []
 
         if self.line_data:
             line_k, line_b = get_line_coefficients(*self.line_data)
@@ -80,18 +81,20 @@ class FrameProcessor:
 
                 event_name = NEW_OBJECT
                 event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
-                events.append(dict(zip(event_keys, event_values)))
-                stats[event_name] += 1
+                event_data.append(dict(zip(event_keys, event_values)))
+                event_names.append(event_name)
 
             if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
                 self.logger.info("Line intersection by object with track ID {} at position ({}, {}).".format(track_id, x_anchor, y_anchor))
 
                 event_name = LINE_INTERSECTION
                 event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
-                events.append(dict(zip(event_keys, event_values)))
-                stats[event_name] += 1
+                event_data.append(dict(zip(event_keys, event_values)))
+                event_names.append(event_name)
 
-        return events, stats
+        stats = Counter(event_names)
+
+        return event_data, stats
 
     def _prepare_frame(self, frame):
         frame = ValTransform()(frame, None, self.input_size)[0]
