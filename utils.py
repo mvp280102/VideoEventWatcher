@@ -15,21 +15,22 @@ async def async_enumerate(async_iterable):
         yield next(index), item
 
 
-# TODO: Params for stream and file handlers.
-def create_logger(name, level=INFO):
+def create_logger(name, stream=True, file=True, level=INFO):
     logger = getLogger(name)
     logger.setLevel(level)
     logger.propagate = False
 
-    stream_handler = StreamHandler()
-    file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(datetime_format.replace(" ", "_"))}.log')
     formatter = Formatter(fmt='{levelname}:\t{name:<12}{asctime:<24}{message}', datefmt=datetime_format, style='{')
 
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    if stream:
+        stream_handler = StreamHandler()
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
 
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    if file:
+        file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(datetime_format.replace(" ", "_"))}.log')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
 
