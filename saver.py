@@ -30,8 +30,9 @@ class EventSaver:
     logger = create_logger(__name__)
 
     def __init__(self, config):
-        # TODO: Refactor with format string.
-        database_url = f'{config.sql_dialect}+{config.db_driver}://{config.db_user}:{config.db_user_password}@{config.host_name}/{config.db_name}'
+        database_url = ('{sql_dialect}+{db_driver}'
+                        '://{db_user}:{db_user_password}'
+                        '@{host_name}/{db_name}').format(**config.credentials)
 
         self.engine = create_engine(database_url)
         BaseModel.metadata.create_all(bind=self.engine)
@@ -39,7 +40,7 @@ class EventSaver:
 
         self.timeout = config.timeout
         self.queue_name = config.queue_name
-        self.host_name = config.host_name
+        self.host_name = config.credentials.host_name
 
     async def save_events(self):
         connection = BlockingConnection(ConnectionParameters(host=self.host_name))
