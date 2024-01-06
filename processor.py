@@ -59,10 +59,10 @@ class FrameProcessor:
 
         return tracks[:, :5].astype('int')
 
-    def get_events(self, tracks):
+    def get_events(self, index, tracks):
         line_k, line_b = None, None
 
-        event_keys = ('timestamp', 'event_name', 'track_id', 'position')
+        event_keys = ('timestamp', 'frame_index', 'track_id', 'event_name')
 
         event_data = []
         event_names = []
@@ -72,23 +72,25 @@ class FrameProcessor:
 
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track
-            x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
+            x_pos, y_pos = int((x_min + x_max) / 2), int(y_max)
             timestamp = datetime.now().strftime(datetime_format)
 
             if track_id not in self.total_tracks:
-                self.logger.info("New object with track ID {} at position ({}, {}).".format(track_id, x_anchor, y_anchor))
+                self.logger.info("New object at frame {} with track ID {} in position ({}, {})."
+                                 .format(index, track_id, x_pos, y_pos))
                 self.total_tracks.add(track_id)
 
                 event_name = NEW_OBJECT
-                event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
+                event_values = (timestamp, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
                 event_names.append(event_name)
 
-            if self.line_data and abs(line_k * x_anchor + line_b - y_anchor) < 1:
-                self.logger.info("Line intersection by object with track ID {} at position ({}, {}).".format(track_id, x_anchor, y_anchor))
+            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < 1:
+                self.logger.info("Line intersection at frame {} by object with track ID {} in position ({}, {})."
+                                 .format(index, track_id, x_pos, y_pos))
 
                 event_name = LINE_INTERSECTION
-                event_values = (timestamp, event_name, int(track_id), (x_anchor, y_anchor))
+                event_values = (timestamp, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
                 event_names.append(event_name)
 
