@@ -2,7 +2,7 @@ import json
 import asyncio
 import numpy as np
 
-from sqlalchemy import create_engine, Column, ARRAY, INTEGER, VARCHAR, TIMESTAMP
+from sqlalchemy import create_engine, Column, INTEGER, VARCHAR, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from pika import BlockingConnection, ConnectionParameters
@@ -16,18 +16,19 @@ class BaseModel(DeclarativeBase):
 
 
 class Event(BaseModel):
-    __tablename__ = 'logs'
+    __tablename__ = 'events'
 
     event_id = Column(INTEGER, nullable=False, primary_key=True, autoincrement=True)
     timestamp = Column(TIMESTAMP(timezone=False), nullable=False)
-    event_name = Column(VARCHAR(length=128), nullable=False)
+    video_path = Column(VARCHAR(length=128), nullable=False)
+    tracks_path = Column(VARCHAR(length=128), nullable=False)
+    frame_index = Column(INTEGER, nullable=False)
     track_id = Column(INTEGER, nullable=False)
-    position = Column(ARRAY(item_type=INTEGER, as_tuple=True), nullable=False)
-    file_path = Column(VARCHAR(length=128), nullable=False)
+    event_name = Column(VARCHAR(length=128), nullable=False)
 
 
 class EventSaver:
-    logger = create_logger(__name__)
+    logger = create_logger(__name__, stream=False)
 
     def __init__(self, config):
         database_url = ('{sql_dialect}+{db_driver}'
@@ -63,6 +64,7 @@ class EventSaver:
                 event = Event(**raw_event)
                 session.add(event)
                 session.commit()
+                # TODO: Split messages receiving and saving to DB.
                 self.logger.info("Write event object {} to database.".format(event))
 
             channel.basic_ack(delivery_tag=method_frame.delivery_tag)
