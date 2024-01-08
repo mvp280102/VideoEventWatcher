@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from watcher import EventWatcher
+from receiver import EventReceiver
 from saver import EventSaver
 
 
@@ -35,4 +36,6 @@ async def save_events(config_object: UploadFile = File(...)):
     config = OmegaConf.load(config_path)
 
     saver = EventSaver(config.saver)
-    await saver.save_events()
+    receiver = EventReceiver(config.receiver)
+
+    await receiver.receive_events([saver.save_event])
