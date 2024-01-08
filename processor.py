@@ -11,8 +11,8 @@ from yolox.data.data_augment import ValTransform
 
 from bytetracker import BYTETracker
 
-from constants import NEW_OBJECT, LINE_INTERSECTION, datetime_format
 from utils import create_logger, get_line_coefficients, filter_detections
+from constants import NEW_OBJECT, LINE_INTERSECTION, DATETIME_FMT, GIL_DELAY_TIME
 
 
 class FrameProcessor:
@@ -47,7 +47,7 @@ class FrameProcessor:
             raw_detections = self.detector(self._prepare_frame(frame))
 
         # to release GIL:
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(GIL_DELAY_TIME)
 
         raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
         filtered_detections = filter_detections(raw_detections[0], label).cpu()
@@ -73,7 +73,7 @@ class FrameProcessor:
         for track in tracks:
             x_min, y_min, x_max, y_max, track_id = track
             x_pos, y_pos = int((x_min + x_max) / 2), int(y_max)
-            timestamp = datetime.now().strftime(datetime_format)
+            timestamp = datetime.now().strftime(DATETIME_FMT)
 
             if track_id not in self.total_tracks:
                 self.logger.info("New object at frame {} with track ID {} in position ({}, {})."

@@ -5,7 +5,7 @@ from math import tan, radians
 from datetime import datetime
 from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
 
-from constants import datetime_format
+from constants import DATETIME_FMT
 
 
 async def async_enumerate(async_iterable):
@@ -20,7 +20,7 @@ def create_logger(name, stream=True, file=True, level=INFO):
     logger.setLevel(level)
     logger.propagate = False
 
-    formatter = Formatter(fmt='{levelname}:\t{name:<12}{asctime:<24}{message}', datefmt=datetime_format, style='{')
+    formatter = Formatter(fmt='{levelname}:\t{name:<12}{asctime:<24}{message}', datefmt=DATETIME_FMT, style='{')
 
     if stream:
         stream_handler = StreamHandler()
@@ -28,7 +28,7 @@ def create_logger(name, stream=True, file=True, level=INFO):
         logger.addHandler(stream_handler)
 
     if file:
-        file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(datetime_format.replace(" ", "_"))}.log')
+        file_handler = FileHandler(f'logs/{name}_{datetime.now().strftime(DATETIME_FMT.replace(" ", "_"))}.log')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
