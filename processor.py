@@ -76,8 +76,6 @@ class FrameProcessor:
             timestamp = datetime.now().strftime(DATETIME_FMT)
 
             if track_id not in self.total_tracks:
-                self.logger.info("New object at frame {} with track ID {} in position ({}, {})."
-                                 .format(index, track_id, x_pos, y_pos))
                 self.total_tracks.add(track_id)
 
                 event_name = NEW_OBJECT
@@ -85,14 +83,17 @@ class FrameProcessor:
                 event_data.append(dict(zip(event_keys, event_values)))
                 event_names.append(event_name)
 
-            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < 1:
-                self.logger.info("Line intersection at frame {} by object with track ID {} in position ({}, {})."
+                self.logger.info("New object at frame {} with track ID {} in position ({}, {})."
                                  .format(index, track_id, x_pos, y_pos))
 
+            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < 1:
                 event_name = LINE_INTERSECTION
                 event_values = (timestamp, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
                 event_names.append(event_name)
+
+                self.logger.info("Line intersection at frame {} by object with track ID {} in position ({}, {})."
+                                 .format(index, track_id, x_pos, y_pos))
 
         stats = Counter(event_names)
 

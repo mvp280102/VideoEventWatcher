@@ -6,7 +6,7 @@ from utils import create_logger
 
 
 class EventSender:
-    logger = create_logger(__name__, stream=False)
+    logger = create_logger(__name__)
 
     def __init__(self, config):
         self.queue_name = config.queue_name
@@ -21,8 +21,9 @@ class EventSender:
         channel.queue_declare(queue=self.queue_name, durable=True)
 
         for event in events:
-            self.logger.info("Send event message {} to '{}' queue.".format(event, self.queue_name))
             channel.basic_publish(exchange='', routing_key=self.queue_name, body=json.dumps(event),
                                   properties=BasicProperties(delivery_mode=DeliveryMode.Persistent))
+
+            self.logger.info("Send event message {} to '{}' queue.".format(event, self.queue_name))
 
         connection.close()
