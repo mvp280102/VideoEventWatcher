@@ -22,7 +22,7 @@ class EventWatcher:
         self.config = config
         self.reader, self.writer = None, None
 
-        self.columns = ['frame_index', 'x_min', 'y_min', 'x_max', 'y_max', 'track_id']
+        self.columns = ['x_min', 'y_min', 'x_max', 'y_max', 'track_id']
         self.total_tracks = pd.DataFrame(columns=self.columns)
 
     async def watch_events(self, file_name):
@@ -32,10 +32,13 @@ class EventWatcher:
         base_name = splitext(file_name)[0]
 
         frames_dir = str(join(self.config.frames_root, base_name))
-        tracks_path = str(join(self.config.tracks_root, base_name + '.csv'))
+        tracks_dir = str(join(self.config.tracks_root, base_name))
 
         if not exists(frames_dir):
             mkdir(frames_dir)
+
+        if not exists(tracks_dir):
+            mkdir(tracks_dir)
 
         self.reader = cv2.VideoCapture(input_path)
 
@@ -72,13 +75,18 @@ class EventWatcher:
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
 
+            raw_tracks_df = pd.DataFrame(raw_tracks, columns=self.columns)
             index_tracks = np.insert(raw_tracks, 0, index, 1)
-            index_tracks_df = pd.DataFrame(index_tracks, columns=self.columns)
-            self.total_tracks = pd.concat([self.total_tracks, index_tracks_df], ignore_index=True)
 
-            raw_events, raw_stats = processor.get_events(index, raw_tracks)
+            tracks_path = join(tracks_dir, '{}.csv'.format(index))
+            raw_tracks_df.to_csv(tracks_path, index=False)
 
-            event_data = {'video_path': input_path, 'tracks_path': tracks_path}
+            self.logger.info("Save tracks for frame {} of '{}' video to '{}' file."
+                             .format(index, input_path, tracks_path))
+
+            raw_events, raw_stats = processor.get_events(index_tracks)
+
+            event_data = {'video_path': input_path}
             events = [{**event, **event_data} for event in raw_events]
 
             sender.send_events(events)
@@ -90,11 +98,8 @@ class EventWatcher:
 
             self.writer.write(frame)
 
-        self.logger.info("Detected {} new objects and {} line intersections.".format(*total_stats.values()))
-
-        self.total_tracks.to_csv(tracks_path, index=False)
-
-        self.logger.info("Save tracks for '{}' video to '{}' file.".format(input_path, tracks_path))
+        self.logger.info("Detected {} new objects and {} line intersections."
+                         .format(*total_stats.values()))
 
         self.reader.release()
         self.writer.release()
@@ -113,4 +118,3 @@ class EventWatcher:
         await ffmpeg.execute()
 
         self.logger.info("Split '{}' video into frames to '{}' dir.".format(input_path, frames_dir))
-
