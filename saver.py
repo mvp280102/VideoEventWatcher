@@ -18,7 +18,6 @@ class Event(BaseModel):
     event_id = Column(INTEGER, nullable=False, primary_key=True, autoincrement=True)
     timestamp = Column(TIMESTAMP(timezone=False), nullable=False)
     video_path = Column(VARCHAR(length=128), nullable=False)
-    tracks_path = Column(VARCHAR(length=128), nullable=True)  # False
     frame_index = Column(INTEGER, nullable=False)
     track_id = Column(INTEGER, nullable=False)
     event_name = Column(VARCHAR(length=128), nullable=False)

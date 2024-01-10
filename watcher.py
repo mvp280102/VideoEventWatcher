@@ -4,23 +4,24 @@ import numpy as np
 import pandas as pd
 
 from os import mkdir
-from collections import defaultdict
 from os.path import join, splitext, exists
 
 from ffmpeg.asyncio import FFmpeg
 
-from processor import FrameProcessor
-from visualizer import EventVisualizer
-from sender import EventSender
 from utils import async_enumerate, create_logger
+from constants import NEW_OBJECT, LINE_INTERSECTION
 
 
 class EventWatcher:
     logger = create_logger(__name__)
 
-    def __init__(self, config):
+    def __init__(self, config, processor, visualizer, sender):
         self.config = config
         self.reader, self.writer = None, None
+
+        self.processor = processor
+        self.visualizer = visualizer
+        self.sender = sender
 
         self.columns = ['x_min', 'y_min', 'x_max', 'y_max', 'track_id']
         self.total_tracks = pd.DataFrame(columns=self.columns)
@@ -53,13 +54,7 @@ class EventWatcher:
 
         self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=fps, frameSize=frame_size)
 
-        line_data = self.config.line_data if 'line_data' in self.config else None
-
-        processor = FrameProcessor(self.config.processor, frame_size, line_data)
-        visualizer = EventVisualizer(frame_size, line_data)
-        sender = EventSender(self.config.sender)
-
-        total_stats = defaultdict(lambda: 0)
+        total_stats = dict.fromkeys([NEW_OBJECT, LINE_INTERSECTION], 0)
 
         await self._split_frames(input_path, frames_dir)
 
@@ -70,7 +65,7 @@ class EventWatcher:
             self.logger.debug("Processing frame {} of {}...".format(index, total_frames))
             start = time.time()
 
-            raw_tracks = await processor.get_tracks(frame, self.config.filter_label)
+            raw_tracks = await self.processor.get_tracks(frame, self.config.filter_label)
 
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
@@ -84,22 +79,21 @@ class EventWatcher:
             self.logger.info("Save tracks for frame {} of '{}' video to '{}' file."
                              .format(index, input_path, tracks_path))
 
-            raw_events, raw_stats = processor.get_events(index_tracks)
+            raw_events, raw_stats = self.processor.get_events(index_tracks)
 
             event_data = {'video_path': input_path}
             events = [{**event, **event_data} for event in raw_events]
 
-            sender.send_events(events)
+            self.sender.send_events(events)
 
             for key in raw_stats:
                 total_stats[key] += raw_stats[key]
 
-            frame = visualizer.draw_annotations(frame, raw_tracks)
+            frame = self.visualizer.draw_annotations(frame, raw_tracks)
 
             self.writer.write(frame)
 
-        self.logger.info("Detected {} new objects and {} line intersections."
-                         .format(*total_stats.values()))
+        self.logger.info("Detected {} new objects and {} line intersections.".format(*total_stats.values()))
 
         self.reader.release()
         self.writer.release()

@@ -18,7 +18,7 @@ from constants import NEW_OBJECT, LINE_INTERSECTION, DATETIME_FMT, GIL_DELAY_TIM
 class FrameProcessor:
     logger = create_logger(__name__)
 
-    def __init__(self, config, frame_size, line_data):
+    def __init__(self, config):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         checkpoint_path = str(join(config.ckpt_root, config.model_name + '.pth'))
@@ -39,8 +39,7 @@ class FrameProcessor:
         self.tracker = BYTETracker()
         self.total_tracks = set()
 
-        self.frame_width, self.frame_height = frame_size
-        self.line_data = line_data
+        self.line_data = config.line_data if 'line_data' in config else None
 
     async def get_tracks(self, frame, label):
         with torch.no_grad():
@@ -52,14 +51,16 @@ class FrameProcessor:
         raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
         filtered_detections = filter_detections(raw_detections[0], label).cpu()
 
-        ratio = min(self.input_size[1] / self.frame_width, self.input_size[0] / self.frame_height)
+        frame_height, frame_width, _ = frame.shape
+
+        ratio = min(self.input_size[1] / frame_width, self.input_size[0] / frame_height)
         filtered_detections[:, :4] /= ratio
 
         tracks = self.tracker.update(filtered_detections, None)
 
         return tracks[:, :5].astype('int')
 
-    def get_events(self, index, tracks):
+    def get_events(self, tracks):
         line_k, line_b = None, None
 
         event_keys = ('timestamp', 'frame_index', 'track_id', 'event_name')
@@ -71,7 +72,7 @@ class FrameProcessor:
             line_k, line_b = get_line_coefficients(*self.line_data)
 
         for track in tracks:
-            x_min, y_min, x_max, y_max, track_id = track
+            index, x_min, y_min, x_max, y_max, track_id = track
             x_pos, y_pos = int((x_min + x_max) / 2), int(y_max)
             timestamp = datetime.now().strftime(DATETIME_FMT)
 

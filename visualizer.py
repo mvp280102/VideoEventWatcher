@@ -5,8 +5,7 @@ from utils import get_line_coefficients, random_color
 
 # TODO: Config for visualizer (bbs and line params).
 class EventVisualizer:
-    def __init__(self, frame_size, line_data):
-        self.frame_width, self.frame_height = frame_size
+    def __init__(self, line_data):
         self.line_data = line_data
         self._track_colors = {}
 
@@ -41,15 +40,17 @@ class EventVisualizer:
         return frame
 
     def _draw_line(self, frame, line_k, line_b):
+        frame_height, frame_width, _ = frame.shape
+
         x1 = -line_b / line_k
         y1 = line_b
 
         point1 = (int(x1), 0) if x1 > 0 else (0, int(y1))
 
-        x2 = (self.frame_height - line_b) / line_k
-        y2 = line_k * self.frame_width + line_b
+        x2 = (frame_height - line_b) / line_k
+        y2 = line_k * frame_width + line_b
 
-        point2 = (int(x2), self.frame_height) if x2 > 0 else (self.frame_width, int(y2))
+        point2 = (int(x2), frame_height) if x2 > 0 else (frame_width, int(y2))
 
         color = (255, 255, 255)
         thickness = 4

@@ -6,7 +6,12 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from watcher import EventWatcher
+from processor import FrameProcessor
+from visualizer import EventVisualizer
+from sender import EventSender
+
 from receiver import EventReceiver
+from extractor import EventExtractor
 from saver import EventSaver
 
 
@@ -17,25 +22,30 @@ app.mount('/configs', configs, name='configs')
 
 
 @app.get('/', response_class=RedirectResponse)
-async def docs_redirect():
+async def redirect_docs():
     return RedirectResponse(url='/docs')
 
 
-@app.post('/process', status_code=status.HTTP_204_NO_CONTENT)
-async def process_video(config_object: UploadFile = File(...), video_object: UploadFile = File(...)):
+@app.post('/produce', status_code=status.HTTP_204_NO_CONTENT)
+async def produce_events(config_object: UploadFile = File(...), video_object: UploadFile = File(...)):
     config_path = join(configs.directory, config_object.filename)
     config = OmegaConf.load(config_path)
 
-    watcher = EventWatcher(config.watcher)
+    processor = FrameProcessor(config.processor)
+    visualizer = EventVisualizer(config.processor.line_data)
+    sender = EventSender(config.sender)
+
+    watcher = EventWatcher(config.watcher, processor, visualizer, sender)
     await watcher.watch_events(video_object.filename)
 
 
-@app.post('/save', status_code=status.HTTP_201_CREATED)
-async def save_events(config_object: UploadFile = File(...)):
+@app.post('/consume', status_code=status.HTTP_201_CREATED)
+async def consume_events(config_object: UploadFile = File(...)):
     config_path = join(configs.directory, config_object.filename)
     config = OmegaConf.load(config_path)
 
+    extractor = EventExtractor(config.extractor)
     saver = EventSaver(config.saver)
-    receiver = EventReceiver(config.receiver)
 
-    await receiver.receive_events([saver.save_event])
+    receiver = EventReceiver(config.receiver, extractor, saver)
+    await receiver.receive_events()
