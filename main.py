@@ -44,7 +44,8 @@ async def consume_events(config_object: UploadFile = File(...)):
     config_path = join(configs.directory, config_object.filename)
     config = OmegaConf.load(config_path)
 
-    extractor = EventExtractor(config.extractor)
+    visualizer = EventVisualizer(config.extractor.line_data)
+    extractor = EventExtractor(config.extractor, visualizer)
     saver = EventSaver(config.saver)
 
     receiver = EventReceiver(config.receiver, extractor, saver)
