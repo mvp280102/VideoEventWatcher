@@ -1,84 +1,83 @@
 import cv2
-import numpy as np
 import pandas as pd
 
-from os import mkdir
-from collections import deque
+from os import mkdir, listdir
 from os.path import join, basename, splitext, exists
 
-from ffmpeg.asyncio import FFmpeg
-
-from visualizer import EventVisualizer
 from utils import create_logger
-from constants import SEC_BEFORE_EVENT, SEC_AFTER_EVENT
 
 
+# TODO: Rewrite this junk in a normal way with several methods.
 class EventExtractor:
     logger = create_logger(__name__)
 
-    def __init__(self, config, input_path, total_frames, frame_size, line_data, fourcc, fps):
-        self.input_path = input_path
+    def __init__(self, config, visualizer):
+        self.frames_root = config.frames_root
+        self.tracks_root = config.tracks_root
+        self.events_root = config.events_root
 
-        self.total_frames = total_frames
-        self.frame_size = frame_size
-        self.line_data = line_data
-        self.fourcc = fourcc
-        self.fps = fps
+        self.req_event_name = config.event_name
 
-        base_name = splitext(basename(self.input_path))[0]
+        self.sec_before_event = config.sec_before_event
+        self.sec_after_event = config.sec_after_event
 
-        self.frames_dir = str(join(config.frames_root, base_name))
-        self.events_dir = str(join(config.events_root, base_name))
-        self.tracks_path = str(join(config.tracks_root, base_name + '.csv'))
+        self.format = config.format
+        self.fourcc = config.fourcc
+        self.fps = config.fps
 
-        if not exists(self.frames_dir):
-            mkdir(self.frames_dir)
+        self.visualizer = visualizer
 
-        if not exists(self.events_dir):
-            mkdir(self.events_dir)
+    async def extract_event(self, event):
+        event_name = event['event_name']
 
-        self.columns = ['frame_index', 'x_min', 'y_min', 'x_max', 'y_max', 'track_id']
-        self.tracks = pd.DataFrame(columns=self.columns)
+        if event_name != self.req_event_name:
+            self.logger.debug("Skip inappropriate event with name '{}'.".format(event_name))
+            return
 
-        self.event_queue = deque()
+        cur_frame_index = event['frame_index']
+        track_id = event['track_id']
 
-    async def split_frames(self):
-        self.logger.info("Split '{}' video into frames to '{}' dir.".format(self.input_path, self.frames_dir))
-        ffmpeg = FFmpeg().option('y').input(self.input_path).output(join(self.frames_dir, '%d.png'))
-        await ffmpeg.execute()
+        base_name = splitext(basename(event['video_path']))[0]
 
-    def snapshot_tracks(self, index, tracks):
-        for track in tracks:
-            track = np.insert(track, 0, index)
-            self.tracks = pd.concat([self.tracks, pd.DataFrame([track], columns=self.columns)], ignore_index=True)
+        frames_dir = str(join(self.frames_root, base_name))
+        tracks_dir = str(join(self.tracks_root, base_name))
+        events_dir = str(join(self.events_root, base_name))
 
-    def save_tracks(self):
-        self.logger.info("Save tracks for '{}' video to '{}' file.".format(self.input_path, self.tracks_path))
-        self.tracks.to_csv(self.tracks_path)
+        if not exists(events_dir):
+            mkdir(events_dir)
 
-    def register_event(self, index, track_id):
-        self.event_queue.append((index, track_id))
+        total_frames = len(listdir(frames_dir))
 
-    def is_ready(self, index):
-        return self.event_queue and index >= self.event_queue[0][0] * SEC_AFTER_EVENT
+        start_frame_index = max(1, cur_frame_index - self.sec_before_event * self.fps)
+        end_frame_index = min(total_frames, cur_frame_index + self.sec_after_event * self.fps)
 
-    def extract_event(self):
-        frame_index, track_id = self.event_queue.popleft()
+        # TODO: Something with last two frames.
+        if not exists(join(tracks_dir, '{}.csv'.format(end_frame_index))):
+            self.logger.info("Skip event with name {} at frame {} due to lack of processed frames."
+                             .format(event_name, cur_frame_index))
+            return
 
-        output_path = join(self.events_dir, '{}_{}.avi'.format(frame_index, track_id))
-        visualizer = EventVisualizer(self.frame_size, self.line_data)
-        writer = cv2.VideoWriter(filename=output_path, fourcc=self.fourcc, fps=self.fps, frameSize=self.frame_size)
+        cur_frame = cv2.imread(join(frames_dir, '{}.png'.format(cur_frame_index)))
+        frame_height, frame_width, _ = cur_frame.shape
+        frame_size = (frame_width, frame_height)
 
-        start_index = max(1, frame_index - SEC_BEFORE_EVENT * self.fps)
-        end_index = min(self.total_frames, frame_index + SEC_AFTER_EVENT * self.fps)
+        cur_tracks = pd.read_csv(join(tracks_dir, '{}.csv'.format(cur_frame_index)))
+        columns = cur_tracks.columns.append(pd.Index(['frame_index']))
+        tracks_df = pd.DataFrame(columns=columns, index=None)
 
-        self.logger.info("Extract event for object with track ID = {} at frame {}.".format(track_id, frame_index))
+        for tracks_file_name in listdir(tracks_dir):
+            tracks = pd.read_csv(join(tracks_dir, tracks_file_name))
+            tracks.insert(0, 'frame_index', int(splitext(tracks_file_name)[0]))
+            tracks_df = pd.concat([tracks_df, pd.DataFrame(tracks, columns=columns)], ignore_index=True)
 
-        for index in range(start_index, end_index):
-            track = self.tracks.loc[(self.tracks['frame_index'] == index) & (self.tracks['track_id'] == track_id)]
+        output_path = join(events_dir, '{}_{}.{}'.format(cur_frame_index, track_id, self.format))
+        fourcc = cv2.VideoWriter.fourcc(*self.fourcc)
+        writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=self.fps, frameSize=frame_size)
 
-            frame = cv2.imread(join(self.frames_dir, '{}.png'.format(index)))
-            frame = visualizer.draw_annotations(frame, track.to_numpy()[:, 1:])
+        for index in range(start_frame_index, end_frame_index):
+            track = tracks_df.loc[(tracks_df['frame_index'] == index) & (tracks_df['track_id'] == track_id)]
+            frame = cv2.imread(join(frames_dir, '{}.png'.format(index)))
+            frame = self.visualizer.draw_annotations(frame, track.to_numpy()[:, :-1])
 
             writer.write(frame)
 
