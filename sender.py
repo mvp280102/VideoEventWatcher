@@ -6,7 +6,7 @@ from utils import create_logger
 
 
 class EventSender:
-    logger = create_logger(__name__, stream=True)
+    logger = create_logger(__name__)
 
     def __init__(self, config):
         self.queue_name = config.queue_name
