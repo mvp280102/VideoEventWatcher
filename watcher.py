@@ -73,7 +73,8 @@ class EventWatcher:
             raw_tracks_df = pd.DataFrame(raw_tracks, columns=self.columns)
             index_tracks = np.insert(raw_tracks, 0, index, 1)
 
-            tracks_path = join(tracks_dir, '{}.csv'.format(index))
+            # increment index to match with ffmpeg frames output:
+            tracks_path = join(tracks_dir, '{}.csv'.format(index + 1))
             raw_tracks_df.to_csv(tracks_path, index=False)
 
             self.logger.info("Save tracks for frame {} of '{}' video to '{}' file."
