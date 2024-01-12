@@ -1,0 +1,28 @@
+receiver:
+  host_name: 'localhost'
+  queue_name: 'vew_events'
+  timeout: 1
+
+saver:
+  credentials:
+    sql_dialect: 'postgresql'
+    db_driver: 'psycopg2'
+
+    db_user: 'videoeventwatcher'
+    db_user_password: 'videoeventwatcher'
+
+    host_name: 'localhost'
+    db_name: 'videoeventwatcher'
+
+extractor:
+  frames_root: 'frames'
+  tracks_root: 'tracks'
+  events_root: 'events'
+
+  event_name: 'line intersection'
+
+  format: 'avi'
+  fourcc: 'XVID'
+  fps: 25
+
+  line_data: [10, [0, 450]]

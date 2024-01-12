@@ -1,0 +1,22 @@
+watcher:
+  frames_skip: 0
+  target_labels: [0]
+
+  inputs_root: 'inputs'
+  outputs_root: 'outputs'
+
+  frames_root: 'frames'
+  tracks_root: 'tracks'
+
+  fourcc: 'XVID'
+  fps: 25
+
+processor:
+  model_name: 'yolox_x'
+  ckpt_root: '/home/mvp280102/models/yolox'
+  input_size: [640, 640]
+  line_data:  [10, [0, 450]]
+
+sender:
+  queue_name: 'vew_events'
+  host_name: 'localhost'
