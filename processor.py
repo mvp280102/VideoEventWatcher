@@ -41,7 +41,7 @@ class FrameProcessor:
 
         self.line_data = config.line_data if 'line_data' in config else None
 
-    async def get_tracks(self, frame, label):
+    async def get_tracks(self, frame, labels):
         with torch.no_grad():
             raw_detections = self.detector(self._prepare_frame(frame))
 
@@ -49,7 +49,7 @@ class FrameProcessor:
         await asyncio.sleep(GIL_DELAY_TIME)
 
         raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
-        filtered_detections = filter_detections(raw_detections[0], label).cpu()
+        filtered_detections = filter_detections(raw_detections[0], labels).cpu()
 
         frame_height, frame_width, _ = frame.shape
 

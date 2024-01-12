@@ -65,7 +65,7 @@ class EventWatcher:
             self.logger.debug("Processing frame {} of {}...".format(index, total_frames))
             start = time.time()
 
-            raw_tracks = await self.processor.get_tracks(frame, self.config.filter_label)
+            raw_tracks = await self.processor.get_tracks(frame, self.config.target_labels)
 
             stop = time.time()
             self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))

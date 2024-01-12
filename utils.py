@@ -1,6 +1,6 @@
-from torch import stack
 from random import randint
 from itertools import count
+from torch import stack, cat
 from math import tan, radians
 from datetime import datetime
 from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
@@ -40,8 +40,19 @@ def get_line_coefficients(degree=0, point=(0, 0)):
     return tan(radians(degree)), point[1] - tan(radians(degree)) * point[0]
 
 
-def filter_detections(detections, label):
-    return stack([detection for detection in filter(lambda d: int(d[-1]) == label, detections)])
+def filter_detections(detections, labels):
+    if not labels:
+        return detections
+
+    result = []
+
+    for label in labels:
+        filtered_detections = [detection for detection in filter(lambda d: int(d[-1]) == label, detections)]
+
+        if filtered_detections:
+            result.append(stack(filtered_detections))
+
+    return cat(result)
 
 
 def random_color():
