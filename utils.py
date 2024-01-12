@@ -47,7 +47,7 @@ def filter_detections(detections, labels):
     result = []
 
     for label in labels:
-        filtered_detections = [detection for detection in filter(lambda d: int(d[-1]) == label, detections)]
+        filtered_detections = [detection for detection in filter(lambda det: int(det[-1]) == label, detections)]
 
         if filtered_detections:
             result.append(stack(filtered_detections))
