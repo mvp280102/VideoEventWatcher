@@ -16,6 +16,7 @@ processor:
   ckpt_root: '/home/mvp280102/models/yolox'
   input_size: [640, 640]
   line_data:  [10, [0, 450]]
+  intersect_thresh: 0.75
 
 sender:
   queue_name: 'vew_events'

@@ -40,6 +40,7 @@ class FrameProcessor:
         self.total_tracks = set()
 
         self.line_data = config.line_data if 'line_data' in config else None
+        self.intersect_thresh = config.intersect_thresh
 
     async def get_tracks(self, frame, labels):
         with torch.no_grad():
@@ -87,7 +88,7 @@ class FrameProcessor:
                 self.logger.info("New object at frame {} with track ID {} in position ({}, {})."
                                  .format(index, track_id, x_pos, y_pos))
 
-            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < 1:
+            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < self.intersect_thresh:
                 event_name = LINE_INTERSECTION
                 event_values = (timestamp, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
