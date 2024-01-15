@@ -10,6 +10,8 @@ class EventReceiver:
     logger = create_logger(__name__)
 
     def __init__(self, config, extractor, saver):
+        self.event_names = config.event_names
+
         self.host_name = config.host_name
         self.queue_name = config.queue_name
         self.timeout = config.timeout
@@ -28,8 +30,14 @@ class EventReceiver:
 
             event, tag = self._receive_event(channel)
 
+            self.logger.info("Receive event message {} from '{}' queue.".format(event, self.queue_name))
+
             if not tag:
                 break
+
+            if event['event_name'] not in self.event_names:
+                self.logger.info("Skip inappropriate event message with name '{}'.".format(event['event_name']))
+                continue
 
             await self.extractor.extract_event(event)
             await self.saver.save_event(event)
@@ -46,7 +54,5 @@ class EventReceiver:
 
         tag = method_frame.delivery_tag
         event = json.loads(body)
-
-        self.logger.info("Receive event message {} from '{}' queue.".format(event, self.queue_name))
 
         return event, tag
