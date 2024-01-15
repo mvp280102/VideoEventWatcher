@@ -37,10 +37,9 @@ class EventReceiver:
 
             if event['event_name'] not in self.event_names:
                 self.logger.info("Skip inappropriate event message with name '{}'.".format(event['event_name']))
-                continue
-
-            await self.extractor.extract_event(event)
-            await self.saver.save_event(event)
+            else:
+                await self.extractor.extract_event(event)
+                await self.saver.save_event(event)
 
             channel.basic_ack(delivery_tag=tag)
 
