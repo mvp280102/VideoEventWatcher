@@ -1,4 +1,6 @@
 receiver:
+  event_names: ['line intersection']
+
   host_name: 'localhost'
   queue_name: 'vew_events'
   timeout: 1
@@ -18,8 +20,6 @@ extractor:
   frames_root: 'frames'
   tracks_root: 'tracks'
   events_root: 'events'
-
-  event_name: 'line intersection'
 
   format: 'avi'
   fourcc: 'XVID'
