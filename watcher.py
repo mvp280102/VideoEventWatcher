@@ -98,6 +98,8 @@ class EventWatcher:
 
         self.writer.release()
 
+        self.logger.info("Write processed video to '{}' file.".format(output_path))
+
     async def _read_frame(self):
         for frame_name in sorted(listdir(self.frames_dir), key=lambda name: int(splitext(name)[0])):
             yield cv2.imread(join(self.frames_dir, frame_name))
