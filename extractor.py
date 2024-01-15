@@ -19,6 +19,9 @@ class EventExtractor:
         self.fourcc = config.fourcc
         self.fps = config.fps
 
+        self.frames_before = config.sec_before * self.fps
+        self.frames_after = config.sec_after * self.fps
+
         self.visualizer = visualizer
 
     async def extract_event(self, event):
@@ -30,6 +33,8 @@ class EventExtractor:
         frames_dir = str(join(self.frames_root, base_name))
         tracks_dir = str(join(self.tracks_root, base_name))
         events_dir = str(join(self.events_root, base_name))
+
+        total_frames = len(listdir(frames_dir))
 
         if not exists(events_dir):
             mkdir(events_dir)
@@ -47,8 +52,8 @@ class EventExtractor:
             tracks_df = pd.concat([tracks_df, pd.DataFrame(tracks, columns=columns)], ignore_index=True)
 
         req_tracks_df = tracks_df.loc[(tracks_df['track_id'] == track_id)]
-        start_frame_index = req_tracks_df['frame_index'].min()
-        end_frame_index = req_tracks_df['frame_index'].max()
+        start_frame_index = max(1, req_tracks_df['frame_index'].min() - self.frames_before)
+        end_frame_index = min(total_frames, req_tracks_df['frame_index'].max() + self.frames_after)
 
         output_path = join(events_dir, '{}_{}.{}'.format(track_id, cur_frame_index, self.format))
         fourcc = cv2.VideoWriter.fourcc(*self.fourcc)

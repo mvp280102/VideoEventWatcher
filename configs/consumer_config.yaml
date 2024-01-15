@@ -25,4 +25,7 @@ extractor:
   fourcc: 'XVID'
   fps: 25
 
+  sec_before: 2
+  sec_after: 2
+
   line_data: [10, [0, 450]]
