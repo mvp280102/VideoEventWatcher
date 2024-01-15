@@ -17,6 +17,7 @@ processor:
   input_size: [640, 640]
   line_data:  [10, [0, 450]]
   intersect_thresh: 0.75
+  track_buffer: 100
 
 sender:
   queue_name: 'vew_events'

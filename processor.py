@@ -36,7 +36,7 @@ class FrameProcessor:
         self.detector.eval()
         self.detector.load_state_dict(checkpoint['model'])
 
-        self.tracker = BYTETracker()
+        self.tracker = BYTETracker(track_buffer=config.track_buffer)
         self.total_tracks = set()
 
         self.line_data = config.line_data if 'line_data' in config else None
