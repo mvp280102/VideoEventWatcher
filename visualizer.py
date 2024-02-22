@@ -1,20 +1,25 @@
 import cv2
 
-from utils import get_line_coefficients, random_color
+from random import randint
+
+from utils import get_line_coefficients
 
 
 # TODO: Config for visualizer (bbs and line params).
 class EventVisualizer:
-    def __init__(self, line_data):
-        self.line_data = line_data
+    def __init__(self, line_angle, line_point):
+        self.line_angle = line_angle
+        self.line_point = line_point
         self._track_colors = {}
 
-    def draw_annotations(self, frame, tracks):
-        if self.line_data:
-            frame = self._draw_line(frame, *get_line_coefficients(*self.line_data))
+    def draw_annotations(self, index, frame, tracks):
+        if self.line_angle and self.line_point:
+            frame = self._draw_line(frame, *get_line_coefficients(self.line_angle, self.line_point))
 
-        for track in tracks:
-            frame = self._draw_bounding_box(frame, track)
+        frame = self._draw_text(frame, "frame {}".format(index))
+
+        for track in tracks.to_numpy():
+            frame = self._draw_bounding_box(frame, track[1:])
 
         return frame
 
@@ -23,7 +28,7 @@ class EventVisualizer:
         x_anchor, y_anchor = int((x_min + x_max) / 2), int(y_max)
 
         if track_id not in self._track_colors:
-            self._track_colors[track_id] = random_color()
+            self._track_colors[track_id] = self._random_color()
 
         font = cv2.FONT_HERSHEY_DUPLEX
         scale = 1
@@ -39,7 +44,8 @@ class EventVisualizer:
 
         return frame
 
-    def _draw_line(self, frame, line_k, line_b):
+    @staticmethod
+    def _draw_line(frame, line_k, line_b):
         frame_height, frame_width, _ = frame.shape
 
         x1 = -line_b / line_k
@@ -58,3 +64,18 @@ class EventVisualizer:
         frame = cv2.line(frame, point1, point2, color, thickness)
 
         return frame
+
+    @staticmethod
+    def _draw_text(frame, text):
+        position = (25, 25)
+        font = cv2.FONT_HERSHEY_DUPLEX
+        scale = 1
+        color = (255, 255, 255)
+
+        frame = cv2.putText(frame, text, position, font, scale, color)
+
+        return frame
+
+    @staticmethod
+    def _random_color():
+        return randint(0, 255), randint(0, 255), randint(0, 255)

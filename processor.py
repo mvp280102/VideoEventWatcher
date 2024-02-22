@@ -1,18 +1,18 @@
 import torch
 import asyncio
+import numpy as np
+import pandas as pd
 
-from os.path import join
+from os import mkdir
 from datetime import datetime
-from collections import Counter
+from argparse import Namespace
+from os.path import exists, join, splitext
 
-from yolox.exp import get_exp
-from yolox.utils import postprocess
-from yolox.data.data_augment import ValTransform
+from ultralytics import YOLO
+from ultralytics.trackers.byte_tracker import BYTETracker
 
-from bytetracker import BYTETracker
-
-from utils import create_logger, get_line_coefficients, filter_detections
-from constants import NEW_OBJECT, LINE_INTERSECTION, DATETIME_FMT, GIL_DELAY_TIME
+from constants import NEW_OBJECT, LINE_INTERSECTION, TRACKS_DF_COLUMNS, DATETIME_FMT, INTERSECT_THRESH, DELAY_TIME
+from utils import create_logger, get_line_coefficients
 
 
 class FrameProcessor:
@@ -21,56 +21,76 @@ class FrameProcessor:
     def __init__(self, config):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        checkpoint_path = str(join(config.ckpt_root, config.model_name + '.pth'))
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        checkpoint_path = str(join(config.ckpt_root, config.detector_name + '.pt'))
 
-        detector_exp = get_exp(exp_name=config.model_name)
+        self.input_size = config.input_size
+        self.tracks_root = config.tracks_root
 
-        self.input_size = config.input_size if 'input_size' in config else detector_exp.input_size
-        self.num_classes = detector_exp.num_classes
-        self.conf_thresh = detector_exp.test_conf
-        self.nms_thresh = detector_exp.nmsthre
+        self.detector = YOLO(model=checkpoint_path, verbose=False)
+        self.detector.to(self.device)
 
-        self.detector = detector_exp.get_model()
-        self.detector.cuda() if self.device == 'cuda' else self.detector.cpu()
-        self.detector.eval()
-        self.detector.load_state_dict(checkpoint['model'])
+        tracker_args = Namespace(track_buffer=config.track_buffer,
+                                 match_thresh=config.match_thresh,
+                                 new_track_thresh=config.new_track_thresh,
+                                 track_low_thresh=config.track_low_thresh,
+                                 track_high_thresh=config.track_high_thresh)
 
-        self.tracker = BYTETracker(track_buffer=config.track_buffer)
+        self.tracker = BYTETracker(tracker_args)
         self.total_tracks = set()
+        self.last_tracks = []
 
-        self.line_data = config.line_data if 'line_data' in config else None
-        self.intersect_thresh = config.intersect_thresh
+        self.frames_skip = config.frames_skip
+        self.target_labels = config.target_labels
 
-    async def get_tracks(self, frame, labels):
-        with torch.no_grad():
-            raw_detections = self.detector(self._prepare_frame(frame))
+        self.line_angle = config.line_angle
+        self.line_point = config.line_point
 
-        # to release GIL:
-        await asyncio.sleep(GIL_DELAY_TIME)
+    async def process_frame(self, file_name, index, frame):
+        base_name = splitext(file_name)[0]
+        tracks_dir = str(join(self.tracks_root, base_name))
 
-        raw_detections = postprocess(raw_detections, self.num_classes, self.conf_thresh, self.nms_thresh, True)
-        filtered_detections = filter_detections(raw_detections[0], labels).cpu()
+        if not exists(tracks_dir):
+            mkdir(tracks_dir)
 
-        frame_height, frame_width, _ = frame.shape
+        tracks = await self._get_tracks(index, frame)
+        self._dump_tracks(tracks, tracks_dir)
+        events = self._find_events(file_name, tracks)
 
-        ratio = min(self.input_size[1] / frame_width, self.input_size[0] / frame_height)
-        filtered_detections[:, :4] /= ratio
+        return events
 
-        tracks = self.tracker.update(filtered_detections, None)
+    async def _get_tracks(self, index, frame):
+        if index % (self.frames_skip + 1):
+            result_tracks = self.last_tracks
+        else:
+            with torch.no_grad():
+                result = self.detector(source=frame, classes=self.target_labels, imgsz=self.input_size)[0]
+                detections = result.boxes.cpu()
 
-        return tracks[:, :5].astype('int')
+            # to release GIL:
+            await asyncio.sleep(DELAY_TIME)
 
-    def get_events(self, tracks):
+            result_tracks = self.tracker.update(detections.numpy())
+
+            # to get around tracker mysterious bug:
+            if result_tracks.any():
+                self.last_tracks = result_tracks
+            else:
+                result_tracks = self.last_tracks
+
+        result_tracks = np.insert(result_tracks, 0, index + 1, 1)
+        result_tracks = result_tracks[:, :6].astype('int')
+
+        return result_tracks
+
+    def _find_events(self, file_name, tracks):
         line_k, line_b = None, None
 
-        event_keys = ('timestamp', 'frame_index', 'track_id', 'event_name')
+        event_keys = ('timestamp', 'file_name', 'frame_index', 'track_id', 'event_name')
 
         event_data = []
-        event_names = []
 
-        if self.line_data:
-            line_k, line_b = get_line_coefficients(*self.line_data)
+        if self.line_angle and self.line_point:
+            line_k, line_b = get_line_coefficients(self.line_angle, self.line_point)
 
         for track in tracks:
             index, x_min, y_min, x_max, y_max, track_id = track
@@ -81,29 +101,34 @@ class FrameProcessor:
                 self.total_tracks.add(track_id)
 
                 event_name = NEW_OBJECT
-                event_values = (timestamp, int(index), int(track_id), event_name)
+                event_values = (timestamp, file_name, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
-                event_names.append(event_name)
 
-                self.logger.info("New object at frame {} with track ID {} in position ({}, {})."
-                                 .format(index, track_id, x_pos, y_pos))
-
-            if self.line_data and abs(line_k * x_pos + line_b - y_pos) < self.intersect_thresh:
+            if self.line_angle and self.line_point and abs(line_k * x_pos + line_b - y_pos) < INTERSECT_THRESH:
                 event_name = LINE_INTERSECTION
-                event_values = (timestamp, int(index), int(track_id), event_name)
+                event_values = (timestamp, file_name, int(index), int(track_id), event_name)
                 event_data.append(dict(zip(event_keys, event_values)))
-                event_names.append(event_name)
 
-                self.logger.info("Line intersection at frame {} by object with track ID {} in position ({}, {})."
-                                 .format(index, track_id, x_pos, y_pos))
+        return event_data
 
-        stats = Counter(event_names)
+    def _filter_detections(self, detections):
+        if not self.target_labels:
+            return detections
 
-        return event_data, stats
+        result = []
 
-    def _prepare_frame(self, frame):
-        frame = ValTransform()(frame, None, self.input_size)[0]
-        frame = torch.from_numpy(frame).unsqueeze(0).float()
-        frame = frame.cuda() if self.device == 'cuda' else frame.cpu()
+        for label in self.target_labels:
+            filtered_detections = [detection for detection in filter(lambda det: int(det[-1]) == label, detections)]
 
-        return frame
+            if filtered_detections:
+                result.append(torch.stack(filtered_detections))
+
+        return torch.cat(result)
+
+    @staticmethod
+    def _dump_tracks(tracks, tracks_dir):
+        tracks_df = pd.DataFrame(tracks, columns=TRACKS_DF_COLUMNS)
+        frame_index = tracks_df['frame_index'][0]
+
+        tracks_path = join(tracks_dir, '{}.csv'.format(frame_index))
+        tracks_df.to_csv(tracks_path, index=False)

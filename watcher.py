@@ -1,111 +1,87 @@
 import cv2
-import time
-import numpy as np
-import pandas as pd
 
-from os import mkdir, listdir
-from os.path import join, splitext, exists
+from os import mkdir
+from os.path import exists, join, splitext
 
 from ffmpeg.asyncio import FFmpeg
 
-from utils import async_enumerate, create_logger
-from constants import NEW_OBJECT, LINE_INTERSECTION
+from utils import async_enumerate, sorted_listdir, create_logger
 
 
 class EventWatcher:
     logger = create_logger(__name__)
 
-    def __init__(self, config, processor, visualizer, sender):
-        self.config = config
-        self.writer = None
-        self.frames_dir, self.tracks_dir = None, None
+    def __init__(self, config, processor, extractor, saver):
+        self.target_events = config.target_events
+
+        self.duplicate_frames = int(config.duplicate_interval * config.fps)
+
+        self.inputs_root = config.inputs_root
+        self.frames_root = config.frames_root
 
         self.processor = processor
-        self.visualizer = visualizer
-        self.sender = sender
+        self.extractor = extractor
+        self.saver = saver
 
-        self.columns = ['frame_index', 'x_min', 'y_min', 'x_max', 'y_max', 'track_id']
-        self.total_tracks = pd.DataFrame(columns=self.columns)
+        self.unique_events = dict()
 
     async def watch_events(self, file_name):
-        input_path = str(join(self.config.inputs_root, file_name))
-        output_path = str(join(self.config.outputs_root, file_name))
+        input_path = str(join(self.inputs_root, file_name))
 
         base_name = splitext(file_name)[0]
 
-        self.frames_dir = str(join(self.config.frames_root, base_name))
-        self.tracks_dir = str(join(self.config.tracks_root, base_name))
+        frames_dir = str(join(self.frames_root, base_name))
 
-        if not exists(self.frames_dir):
-            mkdir(self.frames_dir)
+        if not exists(frames_dir):
+            mkdir(frames_dir)
 
-        if not exists(self.tracks_dir):
-            mkdir(self.tracks_dir)
+        await self._split_frames(input_path, frames_dir)
 
-        fourcc = cv2.VideoWriter.fourcc(*self.config.fourcc)
-        fps = self.config.fps
+        total_events = []
 
-        total_stats = dict.fromkeys([NEW_OBJECT, LINE_INTERSECTION], 0)
+        async for index, frame in async_enumerate(self._get_frames(frames_dir)):
+            events = await self.processor.process_frame(file_name, index, frame)
+            filtered_events = self._filter_events(events)
 
-        await self._split_frames(input_path, self.frames_dir)
+            if filtered_events:
+                self.extractor.events_queue.append(filtered_events)
+                self.saver.save_events(filtered_events)
 
-        total_frames = len(listdir(self.frames_dir))
+                total_events.extend(filtered_events)
 
-        # crutch for getting frame size:
-        temp_frame = cv2.imread(join(self.frames_dir, listdir(self.frames_dir)[0]))
-        frame_height, frame_width, _ = temp_frame.shape
-        frame_size = (frame_width, frame_height)
+            self.extractor.extract_events(file_name)
 
-        self.writer = cv2.VideoWriter(filename=output_path, fourcc=fourcc, fps=fps, frameSize=frame_size)
+        self.extractor.extract_video(file_name)
 
-        async for index, frame in async_enumerate(self._read_frame()):
-            if self.config.frames_skip and index % (self.config.frames_skip + 1):
-                continue
+        return total_events
 
-            self.logger.debug("Processing frame {} of {}...".format(index, total_frames))
-            start = time.time()
+    def _filter_events(self, events):
+        # filter target events:
+        res_events = list(filter(lambda ev: ev['event_name'] in self.target_events, events))
 
-            raw_tracks = await self.processor.get_tracks(frame, self.config.target_labels)
+        # remove duplicate events:
+        res_events = list(filter(lambda ev: (ev['track_id'], ev['event_name']) not in self.unique_events, res_events))
 
-            stop = time.time()
-            self.logger.debug("Processed in {} sec.".format(round(stop - start, 4)))
+        for event in res_events:
+            frame_index = event['frame_index']
+            track_id = event['track_id']
+            event_name = event['event_name']
 
-            index_tracks = np.insert(raw_tracks, 0, index + 1, 1)
-            index_tracks_df = pd.DataFrame(index_tracks, columns=self.columns)
+            event_key = (track_id, event_name)
 
-            # increment index to match with ffmpeg frames output:
-            tracks_path = join(self.tracks_dir, '{}.csv'.format(index + 1))
-            index_tracks_df.to_csv(tracks_path, index=False)
+            if event_key not in self.unique_events or \
+                    self.unique_events[event_key] - frame_index > self.duplicate_frames:
+                self.unique_events[event_key] = frame_index
 
-            self.logger.info("Dump tracks for frame {} of '{}' video to '{}' file."
-                             .format(index + 1, input_path, tracks_path))
-
-            raw_events, raw_stats = self.processor.get_events(index_tracks)
-
-            event_data = {'video_path': input_path}
-            events = [{**event, **event_data} for event in raw_events]
-
-            self.sender.send_events(events)
-
-            for key in raw_stats:
-                total_stats[key] += raw_stats[key]
-
-            frame = self.visualizer.draw_annotations(frame, raw_tracks)
-
-            self.writer.write(frame)
-
-        self.logger.info("Detected {} new objects and {} line intersections.".format(*total_stats.values()))
-
-        self.writer.release()
-
-        self.logger.info("Write processed video to '{}' file.".format(output_path))
-
-    async def _read_frame(self):
-        for frame_name in sorted(listdir(self.frames_dir), key=lambda name: int(splitext(name)[0])):
-            yield cv2.imread(join(self.frames_dir, frame_name))
+        return res_events
 
     async def _split_frames(self, input_path, frames_dir):
         ffmpeg = FFmpeg().option('y').input(input_path).output(join(frames_dir, '%d.png'))
         await ffmpeg.execute()
 
         self.logger.info("Split '{}' video into frames to '{}' dir.".format(input_path, frames_dir))
+
+    @staticmethod
+    async def _get_frames(frames_dir):
+        for frame_name in sorted_listdir(frames_dir):
+            yield cv2.imread(str(join(frames_dir, frame_name)))
